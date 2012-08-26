@@ -7,9 +7,9 @@
 
 import supybot.conf as conf
 import supybot.registry as registry
-from supybot.i18n import PluginInternationalization, internationalizeDocstring
+#from supybot.i18n import PluginInternationalization, internationalizeDocstring
 
-_ = PluginInternationalization('Soccer')
+#_ = PluginInternationalization('Soccer')
 
 def configure(advanced):
     # This will be called by supybot to configure this module.  advanced is
