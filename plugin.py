@@ -17,11 +17,11 @@ from supybot.commands import *
 import supybot.plugins as plugins
 import supybot.ircutils as ircutils
 import supybot.callbacks as callbacks
-from supybot.i18n import PluginInternationalization, internationalizeDocstring
+#from supybot.i18n import PluginInternationalization, internationalizeDocstring
 
-_ = PluginInternationalization('Soccer')
+#_ = PluginInternationalization('Soccer')
 
-@internationalizeDocstring
+#@internationalizeDocstring
 class Soccer(callbacks.Plugin):
     """Add the help for "@plugin help Soccer" here
     This should describe *how* to use this plugin."""
@@ -68,8 +68,10 @@ class Soccer(callbacks.Plugin):
             if div.find('div', attrs={'style':'white-space: nowrap;'}): # <div style="white-space: nowrap;">
                 match = div.find('div', attrs={'style':'white-space: nowrap;'})
                 if match:
-                    match = match.getText().replace('Final -','FT -').replace('Postponed -','PP -')
-                    match = match.replace('(ESPN, UK)','').replace('(ESPN3)','')
+                    match = match.getText()
+                    match = match.replace('Final -',ircutils.mircColor('FT', 'red') + ' -')
+                    match = match.replace('Postponed -',ircutils.mircColor('PP', 'yellow') + ' -')
+                    match = match.replace('(ESPN, UK)','').replace('(ESPN3)','').replace(' ET','').replace(' CT','').replace(' PT','')
                     append_list.append(str(match).strip().encode('utf-8'))
             
         if len(append_list) > 0:
