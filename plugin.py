@@ -47,6 +47,7 @@ class Soccer(callbacks.Plugin):
             else:
                 return leagues[league]
             
+
     ####################
     # Public Functions #
     ####################
@@ -96,7 +97,58 @@ class Soccer(callbacks.Plugin):
     soccer = wrap(soccer, [('somethingWithoutSpaces')])
     
     
-    #def soccerstats(self, irc, msg, args)
+    def soccerstats(self, irc, msg, args, optleague, optstat):
+        """[league] [goals|assists|cards|fairplay]
+        Display stats in league for stat. Ex: EPL goals 
+        """
+        
+        validstat = {'goals':'scorers', 'assists':'assists', 'cards':'discipline', 'fairplay':'fairplay'}
+        
+        leagueString = self._validleagues(league=optleague)
+        
+        if leagueString == "0":
+            irc.reply("Must specify league. Leagues is one of: %s" % (self._validleagues(league=None)))
+            return
+
+        url = self._b64decode('aHR0cDovL3NvY2Nlcm5ldC5lc3BuLmdvLmNvbS9zdGF0cw==') + '/%s/_/league/%s/' % (validstat[optstat], leagueString)
+    
+        try:
+            req = urllib2.Request(url)
+            html = (urllib2.urlopen(req)).read()
+        except:
+            irc.reply("Failed to open %s" % url)
+            return
+
+        html = html.replace('&nbsp;','')
+
+        if "There are no statistics available for this season." in html:
+            irc.reply("I did not find any statistics for: %s in %s" % (optstat, optleague))
+            return
+            
+        soup = BeautifulSoup(html)
+        table = soup.find('table', attrs={'class':'tablehead'})
+        header = table.find('tr', attrs={'class':'colhead'}).findAll('td')
+        rows = table.findAll('tr', attrs={'class':re.compile('(^odd|^even)row')})[0:5] # int option
+
+        del header[0] # no need for rank.
+
+        append_list = []
+
+        for row in rows:
+            tds = row.findAll('td')
+            del tds[0] # delete the first as it is the rank.
+            mini_list = []
+            for i,td in enumerate(tds):
+                colname = header[i].getText().replace('Team','T').replace('Player','Plr').replace('Yellow','Y').replace('Red','R').replace('Points','Pts').replace('Assists','A').replace('Goals','G')
+                colstat = td
+                mini_list.append(ircutils.bold(colname) + ": " + colstat.getText()) # bold colname.
+            append_list.append(" ".join(mini_list))
+    						
+        descstring = string.join([item for item in append_list], " | ")
+        output = "Leaders in {0} for {1} :: {2}".format(ircutils.mircColor(optstat, 'red'), ircutils.underline(optleague), descstring)
+        irc.reply(output)
+        
+    soccerstats = wrap(soccerstats, [('somethingWithoutSpaces'), ('somethingWithoutSpaces')])
 
 Class = Soccer
 
