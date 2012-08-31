@@ -17,11 +17,11 @@ from supybot.commands import *
 import supybot.plugins as plugins
 import supybot.ircutils as ircutils
 import supybot.callbacks as callbacks
-#from supybot.i18n import PluginInternationalization, internationalizeDocstring
+from supybot.i18n import PluginInternationalization, internationalizeDocstring
 
-#_ = PluginInternationalization('Soccer')
+_ = PluginInternationalization('Soccer')
 
-#@internationalizeDocstring
+@internationalizeDocstring
 class Soccer(callbacks.Plugin):
     """Add the help for "@plugin help Soccer" here
     This should describe *how* to use this plugin."""
@@ -85,7 +85,7 @@ class Soccer(callbacks.Plugin):
                     match = match.getText().encode('utf-8') # do string formatting/color below. Ugly but it works.
                     match = match.replace('Final -',ircutils.mircColor('FT', 'red') + ' -')
                     match = match.replace('Postponed -',ircutils.mircColor('PP', 'yellow') + ' -')
-                    match = match.replace('(ESPN, UK)','').replace('(ESPN3)','').replace(' ET','').replace(' CT','').replace(' PT','')
+                    match = match.replace('(ESPN, UK)','').replace('(ESPN3)','').replace(' ET','').replace(' CT','').replace(' PT','').replace('(ESPN2)','')
                     # 17' - Osasuna 1-0 Barcelona | 2:00 PM - Getafe vs Real Madrid
                     append_list.append(str(match).strip())
             
@@ -145,11 +145,70 @@ class Soccer(callbacks.Plugin):
             append_list.append(" ".join(mini_list))
     						
         descstring = string.join([item for item in append_list], " | ")
-        output = "Leaders in {0} for {1} :: {2}".format(ircutils.mircColor(optstat, 'red'), ircutils.underline(optleague), descstring)
+        output = "Leaders in {0} for {1} :: {2}".format(ircutils.mircColor(optstat, 'red'), ircutils.underline(optleague), descstring.encode('utf-8'))
         irc.reply(output)
         
     soccerstats = wrap(soccerstats, [('somethingWithoutSpaces'), ('somethingWithoutSpaces')])
+    
+    
+    def soccertable(self, irc, msg, args, optleague):
+        """[league]
+        Display a league's table (standings).
+        """
 
+        leagueString = self._validleagues(league=optleague)
+        
+        if leagueString == "0":
+            irc.reply("Must specify league. Leagues is one of: %s" % (self._validleagues(league=None)))
+            return
+    
+        url = self._b64decode('aHR0cDovL3NvY2Nlcm5ldC5lc3BuLmdvLmNvbS90YWJsZXMvXy9sZWFndWU=') + '/%s/' % leagueString
+    
+        try: 
+            req = urllib2.Request(url)
+            html = (urllib2.urlopen(req)).read()
+        except:
+            irc.reply("Failed to open: %s" % url)
+            return
+            
+        html = html.replace('&nbsp;','')
+
+        soup = BeautifulSoup(html)
+        tables = soup.findAll('table', attrs={'class':'tablehead'})
+        
+        for table in tables: # must do this because of MLS
+            header = table.find('tr', attrs={'class':'colhead'}).findAll('td')
+            title = table.find('thead').find('tr', attrs={'class':'stathead sl'})
+            titleSpan = title.find('span') # remove span which has the current date.
+            if titleSpan:
+                titleSpan.extract()
+            rows = table.findAll('tr', attrs={'align':'right'})[1:] # int option
+
+            append_list = []
+
+            for row in rows:
+                tds = row.findAll('td')
+                rank = tds[0]
+                movement = tds[1].find('img')['src']
+                team = tds[2]
+                gd = tds[-2]
+                pts = tds[-1]
+                if "up_arrow" in movement:
+                    appendString = (u"▴ " + rank.getText() + ". " + team.getText() + " " + pts.getText())
+                elif "down_arrow" in movement:
+                    appendString = (u"↓ " + rank.getText() + ". " + team.getText() + " " + pts.getText())
+                else:
+                    appendString = (rank.getText() + ". " + team.getText() + " " + pts.getText())
+                append_list.append(appendString)
+    
+            descstring = string.join([item for item in append_list], " | ")
+            output = "{0} :: {1}".format(ircutils.bold(title.getText()), descstring.encode('utf-8'))
+            
+            irc.reply(output)
+        
+    
+    soccertable = wrap(soccertable, [('somethingWithoutSpaces')])
+        
 Class = Soccer
 
 # vim:set shiftwidth=4 softtabstop=4 expandtab textwidth=250:
