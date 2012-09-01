@@ -11,6 +11,7 @@ import re
 from BeautifulSoup import BeautifulSoup
 import collections
 import string
+import unicodedata
 
 import supybot.utils as utils
 from supybot.commands import *
@@ -31,6 +32,10 @@ class Soccer(callbacks.Plugin):
         """Returns base64 decoded string."""
         import base64
         return base64.b64decode(string)
+    
+    def _remove_accents(self, data):
+        nkfd_form = unicodedata.normalize('NFKD', unicode(data))
+        return u"".join([c for c in nkfd_form if not unicodedata.combining(c)])
 
     def _validleagues(self, league=None):
         """Return string containing league string if valid, 0 if error. If no league given, return leagues as keys of tuple."""
@@ -170,8 +175,8 @@ class Soccer(callbacks.Plugin):
         except:
             irc.reply("Failed to open: %s" % url)
             return
-            
-        html = html.replace('&nbsp;','')
+        
+        self.log.info(url)
 
         soup = BeautifulSoup(html)
         tables = soup.findAll('table', attrs={'class':'tablehead'})
@@ -194,16 +199,16 @@ class Soccer(callbacks.Plugin):
                 gd = tds[-2]
                 pts = tds[-1]
                 if "up_arrow" in movement:
-                    appendString = (u"▴ " + rank.getText() + ". " + team.getText() + " " + pts.getText())
+                    appendString = (rank.getText() + ". " + self._remove_accents(team.getText()) + " " + pts.getText())
                 elif "down_arrow" in movement:
-                    appendString = (u"↓ " + rank.getText() + ". " + team.getText() + " " + pts.getText())
+                    appendString = (rank.getText() + ". " + self._remove_accents(team.getText()) + " " + pts.getText())
                 else:
-                    appendString = (rank.getText() + ". " + team.getText() + " " + pts.getText())
+                    appendString = (rank.getText() + ". " + self._remove_accents(team.getText()) + " " + pts.getText())
                 append_list.append(appendString)
     
+            title = self._remove_accents(title.getText().strip().replace('\r\n','')) # clean up title. some have \r\n.
             descstring = string.join([item for item in append_list], " | ")
-            output = "{0} :: {1}".format(ircutils.bold(title.getText()), descstring.encode('utf-8'))
-            
+            output = "{0} :: {1}".format(ircutils.bold(title), descstring)
             irc.reply(output)
         
     
