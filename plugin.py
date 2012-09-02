@@ -89,6 +89,7 @@ class Soccer(callbacks.Plugin):
                 if match:
                     match = match.getText().encode('utf-8') # do string formatting/color below. Ugly but it works.
                     match = match.replace('Final -',ircutils.mircColor('FT', 'red') + ' -')
+                    match = match.replace('Half -',ircutils.mircColor('HT', 'yellow') + ' -')
                     match = match.replace('Postponed -',ircutils.mircColor('PP', 'yellow') + ' -')
                     match = match.replace('(ESPN, UK)','').replace('(ESPN3)','').replace(' ET','').replace(' CT','').replace(' PT','').replace('(ESPN2)','')
                     # 17' - Osasuna 1-0 Barcelona | 2:00 PM - Getafe vs Real Madrid
@@ -98,7 +99,8 @@ class Soccer(callbacks.Plugin):
             descstring = string.join([item for item in append_list], " | ")
             irc.reply(descstring)
         else:
-            irc.reply("I did not find any matches going on for: %s" % leagueString)          
+            irc.reply("I did not find any matches going on for: %s" % leagueString)
+                 
     soccer = wrap(soccer, [('somethingWithoutSpaces')])
     
     
