@@ -37,8 +37,22 @@ class Soccer(callbacks.Plugin):
         nkfd_form = unicodedata.normalize('NFKD', unicode(data))
         return u"".join([c for c in nkfd_form if not unicodedata.combining(c)])
 
+    def _validtournaments(self, tournament=None):
+        """Return string containing tournament string if valid, 0 if error. If no tournament is given, return dict keys."""
+        tournaments = { 'WCQ-UEFA':'fifa.worldq.uefa', 'IntlFriendly':'fifa.friendly', 
+                    'WCQ-CONCACAF':'fifa.worldq.concacaf', 'WCQ-CONMEBOL':'fifa.worldq.conmebol'
+                    }
+        
+        if tournament is None:
+            return tournaments.keys() # return the keys here for an list to display.
+        else:
+            if tournament not in tournaments:
+                return "0" # to parse an error.
+            else:
+                return tournaments[tournament]
+
     def _validleagues(self, league=None):
-        """Return string containing league string if valid, 0 if error. If no league given, return leagues as keys of tuple."""
+        """Return string containing league string if valid, 0 if error. If no league given, return leagues as keys of dict."""
         leagues = { 'MLS':'usa.1', 'EPL':'eng.1', 'LaLiga':'esp.1',
                     'SerieA':'ita.1', 'Bundesliga':'ger.1', 'Ligue1':'fra.1',
                     'Eredivise':'ned.1', 'LigaMX':'mex.1'
@@ -58,18 +72,26 @@ class Soccer(callbacks.Plugin):
     ####################
             
     
-    def soccer(self, irc, msg, args, optleague):
+    def soccer(self, irc, msg, args, optscore):
         """[league]
-        Display live/completed scores for various leagues.
+        Display live/completed scores for various leagues and tournaments. 
         """
         
-        leagueString = self._validleagues(league=optleague)
+        leagueString = self._validleagues(league=optscore)
         
         if leagueString == "0":
-            irc.reply("Must specify league. Leagues is one of: %s" % (self._validleagues(league=None)))
-            return
+            tournamentString = self._validtournaments(tournament=optscore)
+            
+            if tournamentString == "0":
+                keys = self._validleagues(league=None) + self._validtournaments(tournament=None)
+                irc.reply("Must specify a valid league or tournament: %s" % (keys))
+                return
+            else:
+                urlString = tournamentString
+        else:
+            urlString = leagueString
 
-        url = self._b64decode('aHR0cDovL20uZXNwbi5nby5jb20vc29jY2VyL3Njb3JlYm9hcmQ/') + 'leagueTag=%s&lang=EN&wjb=' % (leagueString)
+        url = self._b64decode('aHR0cDovL20uZXNwbi5nby5jb20vc29jY2VyL3Njb3JlYm9hcmQ/') + 'leagueTag=%s&lang=EN&wjb=' % (urlString)
     
         try:
             req = urllib2.Request(url)
