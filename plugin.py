@@ -40,7 +40,8 @@ class Soccer(callbacks.Plugin):
     def _validtournaments(self, tournament=None):
         """Return string containing tournament string if valid, 0 if error. If no tournament is given, return dict keys."""
         tournaments = { 'WCQ-UEFA':'fifa.worldq.uefa', 'IntlFriendly':'fifa.friendly', 
-                    'WCQ-CONCACAF':'fifa.worldq.concacaf', 'WCQ-CONMEBOL':'fifa.worldq.conmebol'
+                    'WCQ-CONCACAF':'fifa.worldq.concacaf', 'WCQ-CONMEBOL':'fifa.worldq.conmebol',
+                    'UCL':'UEFA.CHAMPIONS'
                     }
         
         if tournament is None:
