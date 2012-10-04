@@ -39,9 +39,9 @@ class Soccer(callbacks.Plugin):
 
     def _validtournaments(self, tournament=None):
         """Return string containing tournament string if valid, 0 if error. If no tournament is given, return dict keys."""
-        tournaments = { 'WCQ-UEFA':'fifa.worldq.uefa', 'IntlFriendly':'fifa.friendly', 
-                    'WCQ-CONCACAF':'fifa.worldq.concacaf', 'WCQ-CONMEBOL':'fifa.worldq.conmebol',
-                    'UCL':'UEFA.CHAMPIONS', 'CARLING':'ENG.WORTHINGTON'
+        tournaments = { 'wcq-uefa':'fifa.worldq.uefa', 'intlfriendly':'fifa.friendly', 
+                    'wcq-concacaf':'fifa.worldq.concacaf', 'wcq-conmebol':'fifa.worldq.conmebol',
+                    'ucl':'UEFA.CHAMPIONS', 'carling':'ENG.WORTHINGTON', 'europa':'UEFA.EUROPA'
                     }
         
         if tournament is None:
@@ -54,9 +54,9 @@ class Soccer(callbacks.Plugin):
 
     def _validleagues(self, league=None):
         """Return string containing league string if valid, 0 if error. If no league given, return leagues as keys of dict."""
-        leagues = { 'MLS':'usa.1', 'EPL':'eng.1', 'LaLiga':'esp.1',
-                    'SerieA':'ita.1', 'Bundesliga':'ger.1', 'Ligue1':'fra.1',
-                    'Eredivise':'ned.1', 'LigaMX':'mex.1'
+        leagues = { 'mls':'usa.1', 'epl':'eng.1', 'laliga':'esp.1',
+                    'seriea':'ita.1', 'bundesliga':'ger.1', 'ligue1':'fra.1',
+                    'eredivise':'ned.1', 'ligamx':'mex.1'
                   }
         
         if league is None:
@@ -77,6 +77,8 @@ class Soccer(callbacks.Plugin):
         """[league]
         Display live/completed scores for various leagues and tournaments. 
         """
+        
+        optscore = optscore.lower()
         
         leagueString = self._validleagues(league=optscore)
         
