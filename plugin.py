@@ -113,11 +113,15 @@ class Soccer(callbacks.Plugin):
                 match = div.find('div', attrs={'style':'white-space: nowrap;'})
                 if match:
                     match = match.getText().encode('utf-8') # do string formatting/color below. Ugly but it works.
-                    match = match.replace('Final -',ircutils.mircColor('FT', 'red') + ' -')
-                    match = match.replace('Half -',ircutils.mircColor('HT', 'yellow') + ' -')
-                    match = match.replace('Postponed -',ircutils.mircColor('PP', 'yellow') + ' -')
+                    if not self.registryValue('disableANSI', msg.args[0]): # display color or not?
+                        match = match.replace('Final -',ircutils.mircColor('FT', 'red') + ' -')
+                        match = match.replace('Half -',ircutils.mircColor('HT', 'yellow') + ' -')
+                        match = match.replace('Postponed -',ircutils.mircColor('PP', 'yellow') + ' -')
+                    else: 
+                        match = match.replace('Final -', 'FT -')
+                        match = match.replace('Half -', 'HT -')
+                        match = match.replace('Postponed -', 'PP -')
                     match = match.replace('(ESPN, UK)','').replace('(ESPN3)','').replace(' ET','').replace(' CT','').replace(' PT','').replace('(ESPN2)','')
-                    # 17' - Osasuna 1-0 Barcelona | 2:00 PM - Getafe vs Real Madrid
                     append_list.append(str(match).strip())
             
         if len(append_list) > 0:
