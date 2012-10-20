@@ -177,7 +177,10 @@ class Soccer(callbacks.Plugin):
             for i,td in enumerate(tds):
                 colname = header[i].getText().replace('Team','T').replace('Player','Plr').replace('Yellow','Y').replace('Red','R').replace('Points','Pts').replace('Assists','A').replace('Goals','G')
                 colstat = td
-                mini_list.append(ircutils.bold(colname) + ": " + colstat.getText()) # bold colname.
+                if not self.registryValue('disableANSI', msg.args[0]): # display color or not?
+                    mini_list.append(ircutils.bold(colname) + ": " + colstat.getText()) 
+                else:
+                    mini_list.append(colname + ": " + colstat.getText())
             append_list.append(" ".join(mini_list))
     						
         descstring = string.join([item for item in append_list], " | ")
@@ -239,7 +242,10 @@ class Soccer(callbacks.Plugin):
     
             title = self._remove_accents(title.getText().strip().replace('\r\n','')) # clean up title. some have \r\n.
             descstring = string.join([item for item in append_list], " | ")
-            output = "{0} :: {1}".format(ircutils.bold(title), descstring)
+            if not self.registryValue('disableANSI', msg.args[0]):
+                output = "{0} :: {1}".format(ircutils.bold(title), descstring)
+            else:
+                output = "{0} :: {1}".format(title, descstring)
             irc.reply(output)
         
     
