@@ -113,15 +113,26 @@ class Soccer(callbacks.Plugin):
                 match = div.find('div', attrs={'style':'white-space: nowrap;'})
                 if match:
                     match = match.getText().encode('utf-8') # do string formatting/color below. Ugly but it works.
+                    match = match.replace('(ESPN, UK)','').replace('(ESPN3)','').replace(' ET','').replace(' CT','').replace(' PT','').replace('(ESPN2)','') # remove TV.
                     if not self.registryValue('disableANSI', msg.args[0]): # display color or not?
                         match = match.replace('Final -',ircutils.mircColor('FT', 'red') + ' -')
                         match = match.replace('Half -',ircutils.mircColor('HT', 'yellow') + ' -')
                         match = match.replace('Postponed -',ircutils.mircColor('PP', 'yellow') + ' -')
+                        
+                        if not " vs " in match: # Colorize who is winning. so, skip over any future matches.
+                            parts = re.split("^(.*?)\s-\s(.*?)\s(\d+)-(\d+)\s(.*?)$", match)
+                            if parts[3] > parts[4]: # homeTeam winning.
+                                match = "{0} - {1} {2}-{3} {4}".format(parts[1],ircutils.bold(parts[2]),ircutils.bold(parts[3]),parts[4],parts[5])
+                            elif parts[4] > parts[3]: #awayTeam winning.
+                                match = "{0} - {1} {2}-{3} {4}".format(parts[1],parts[2],parts[3],ircutils.bold(parts[4]),ircutils.bold(parts[5]))
+                            else: # tied
+                                match = "{0} - {1} {2}-{3} {4}".format(parts[1],parts[2],parts[3],parts[4],parts[5])                            
+                    
                     else: 
                         match = match.replace('Final -', 'FT -')
                         match = match.replace('Half -', 'HT -')
                         match = match.replace('Postponed -', 'PP -')
-                    match = match.replace('(ESPN, UK)','').replace('(ESPN3)','').replace(' ET','').replace(' CT','').replace(' PT','').replace('(ESPN2)','')
+
                     append_list.append(str(match).strip())
             
         if len(append_list) > 0:
