@@ -149,12 +149,19 @@ class Soccer(callbacks.Plugin):
         Display stats in league for stat. Ex: EPL goals 
         """
         
+        optleague = optleague.lower()
+        optstat = optstat.lower()
+        
         validstat = {'goals':'scorers', 'assists':'assists', 'cards':'discipline', 'fairplay':'fairplay'}
         
         leagueString = self._validleagues(league=optleague)
         
         if leagueString == "0":
             irc.reply("Must specify league. Leagues is one of: %s" % (self._validleagues(league=None)))
+            return
+
+        if optstat not in validstat:
+            irc.reply("ERROR: Stat category must be one of: %s" % validstat.keys())
             return
 
         url = self._b64decode('aHR0cDovL3NvY2Nlcm5ldC5lc3BuLmdvLmNvbS9zdGF0cw==') + '/%s/_/league/%s/' % (validstat[optstat], leagueString)
@@ -206,6 +213,8 @@ class Soccer(callbacks.Plugin):
         Display a league's table (standings).
         """
 
+        optleague = optleague.lower()
+
         leagueString = self._validleagues(league=optleague)
         
         if leagueString == "0":
@@ -220,8 +229,6 @@ class Soccer(callbacks.Plugin):
         except:
             irc.reply("Failed to open: %s" % url)
             return
-        
-        self.log.info(url)
 
         soup = BeautifulSoup(html)
         tables = soup.findAll('table', attrs={'class':'tablehead'})
