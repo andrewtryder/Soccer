@@ -116,20 +116,24 @@ class Soccer(callbacks.Plugin):
                     match = match.replace('(ESPN, UK)','').replace('(ESPN3)','').replace(' ET','').replace(' CT','').replace(' PT','').replace('(ESPN2)','') # remove TV.
                     match = match.replace('(ESPN, US)','')
                     
+                    match = self._remove_accents(match)
+                    
                     if not self.registryValue('disableANSI', msg.args[0]): # display color or not?
-                        match = match.replace('Final -',ircutils.mircColor('FT', 'red') + ' -')
-                        match = match.replace('Half -',ircutils.mircColor('HT', 'yellow') + ' -')
-                        match = match.replace('Postponed -',ircutils.mircColor('PP', 'yellow') + ' -')
-                        
                         if not " vs " in match: # Colorize who is winning. so, skip over any future matches.
-                            parts = re.split("^(.*?)\s-\s(.*?)\s(\d+)-(\d+)\s(.*?)$", match)
-                            if parts[3] > parts[4]: # homeTeam winning.
-                                match = "{0} - {1} {2}-{3} {4}".format(parts[1],ircutils.bold(parts[2]),ircutils.bold(parts[3]),parts[4],parts[5])
-                            elif parts[4] > parts[3]: #awayTeam winning.
-                                match = "{0} - {1} {2}-{3} {4}".format(parts[1],parts[2],parts[3],ircutils.bold(parts[4]),ircutils.bold(parts[5]))
-                            else: # tied
-                                match = "{0} - {1} {2}-{3} {4}".format(parts[1],parts[2],parts[3],parts[4],parts[5])                            
+                            parts = re.split("^(.*?)\s-\s(.*?)\s(\d+)-(\d+)\s(.*?)$", match) # regex for score.
+                            #self.log.info("{0} length: {1}".format(str(match), len(parts)))
+                            if len(parts) is 7:
+                                if parts[3] > parts[4]: # homeTeam winning.
+                                    match = "{0} - {1} {2}-{3} {4}".format(parts[1],ircutils.bold(parts[2]),ircutils.bold(parts[3]),parts[4],parts[5])
+                                elif parts[4] > parts[3]: #awayTeam winning.
+                                    match = "{0} - {1} {2}-{3} {4}".format(parts[1],parts[2],parts[3],ircutils.bold(parts[4]),ircutils.bold(parts[5]))
+                                else: # tied
+                                    match = "{0} - {1} {2}-{3} {4}".format(parts[1],parts[2],parts[3],parts[4],parts[5])                            
 
+                            # finish up by abbr/color
+                            match = match.replace('Final -',ircutils.mircColor('FT', 'red') + ' -')
+                            match = match.replace('Half -',ircutils.mircColor('HT', 'yellow') + ' -')
+                            match = match.replace('Postponed -',ircutils.mircColor('PP', 'yellow') + ' -')                                                                    
                     else: # don't display color so we do normal replacement.
                         match = match.replace('Final -', 'FT -')
                         match = match.replace('Half -', 'HT -')
