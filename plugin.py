@@ -113,10 +113,10 @@ class Soccer(callbacks.Plugin):
                 match = div.find('div', attrs={'style':'white-space: nowrap;'})
                 if match:
                     match = match.getText().encode('utf-8') # do string formatting/color below. Ugly but it works.
+                    #self.log.info(str(match))
                     match = match.replace('(ESPN, UK)','').replace('(ESPN3)','').replace(' ET','').replace(' CT','').replace(' PT','').replace('(ESPN2)','') # remove TV.
                     match = match.replace('(ESPN, US)','')
-                    
-                    match = self._remove_accents(match)
+                    #match = self._remove_accents(match)
                     
                     if not self.registryValue('disableANSI', msg.args[0]): # display color or not?
                         if not " vs " in match: # Colorize who is winning. so, skip over any future matches.
@@ -133,7 +133,11 @@ class Soccer(callbacks.Plugin):
                             # finish up by abbr/color
                             match = match.replace('Final -',ircutils.mircColor('FT', 'red') + ' -')
                             match = match.replace('Half -',ircutils.mircColor('HT', 'yellow') + ' -')
-                            match = match.replace('Postponed -',ircutils.mircColor('PP', 'yellow') + ' -')                                                                    
+                            match = match.replace('Postponed -',ircutils.mircColor('PP', 'yellow') + ' -')
+                        else: # vs in match. String looks like: 11:45 AM - Stoke City vs Liverpool
+                            parts = match.split(' ', 2)
+                            # ['9:30', 'AM', '- Aston Villa vs Tottenham Hotspur'] # timedelta?
+                                                                                            
                     else: # don't display color so we do normal replacement.
                         match = match.replace('Final -', 'FT -')
                         match = match.replace('Half -', 'HT -')
@@ -141,7 +145,7 @@ class Soccer(callbacks.Plugin):
 
                     append_list.append(str(match).strip())
             
-        if len(append_list) > 0:
+        if len(append_list) > 0: # if more than 8.
             descstring = string.join([item for item in append_list], " | ")
             irc.reply(descstring)
         else:
