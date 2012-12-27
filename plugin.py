@@ -36,6 +36,22 @@ class Soccer(callbacks.Plugin):
     def _remove_accents(self, data):
         nkfd_form = unicodedata.normalize('NFKD', unicode(data))
         return u"".join([c for c in nkfd_form if not unicodedata.combining(c)])
+    
+    def _convertGMT(self, thetz, thetime, ampm):
+        """Crude function to take TZ TIME AM/PM from scores to convert into GMT."""
+        import pytz, datetime # needed libs.
+        if thetz == "PT":
+            local = pytz.timezone("America/Los_Angeles")
+        elif thetz == "MT":
+            local = pytz.timezone("America/Denver")
+        elif thetz == "CT":
+            local = pytz.timezone("America/Chicago")
+        elif thetz == "ET":
+            local = pytz.timezone("America/New_York")
+        naive = datetime.datetime.strptime(thetime + " " + ampm, "%I:%M %p")
+        local_dt = local.localize(naive, is_dst=None)
+        utc_dt = local_dt.astimezone (pytz.utc)
+        return utc_dt.strftime ("%H:%M")
 
     def _validtournaments(self, tournament=None):
         """Return string containing tournament string if valid, 0 if error. If no tournament is given, return dict keys."""
@@ -113,9 +129,9 @@ class Soccer(callbacks.Plugin):
                 match = div.find('div', attrs={'style':'white-space: nowrap;'})
                 if match:
                     match = match.getText().encode('utf-8') # do string formatting/color below. Ugly but it works.
-                    #self.log.info(str(match))
-                    match = match.replace('(ESPN, UK)','').replace('(ESPN3)','').replace(' ET','').replace(' CT','').replace(' PT','').replace('(ESPN2)','') # remove TV.
-                    match = match.replace('(ESPN, US)','')
+                    match = match.replace('(ESPN, UK)','').replace('(ESPN3)','').replace('(ESPN2)','').replace('(ESPN, US)','') # remove TV.
+                    
+                    #match = match.replace(' ET','').replace(' CT','').replace(' PT','')
                     #match = self._remove_accents(match)
                     
                     if not self.registryValue('disableANSI', msg.args[0]): # display color or not?
@@ -134,10 +150,15 @@ class Soccer(callbacks.Plugin):
                             match = match.replace('Final -',ircutils.mircColor('FT', 'red') + ' -')
                             match = match.replace('Half -',ircutils.mircColor('HT', 'yellow') + ' -')
                             match = match.replace('Postponed -',ircutils.mircColor('PP', 'yellow') + ' -')
-                        else: # vs in match. String looks like: 11:45 AM - Stoke City vs Liverpool
-                            parts = match.split(' ', 2)
-                            # ['9:30', 'AM', '- Aston Villa vs Tottenham Hotspur'] # timedelta?
-                                                                                            
+                        elif " vs " in match: # vs in match. String looks like: 11:45 AM - Stoke City vs Liverpool
+                            parts = match.split(' ', 3) # try to split into 4, ['11:45', 'AM', 'PT', '- Stoke City vs Liverpool']
+                            if len(parts) is 4: # see if the string split right.
+                                if parts[2] == "ET" or parts[2] == "CT" or parts[2] == "MT" or parts[2] == "PT": # last sanity check.
+                                    try:
+                                        correctedtime = self._convertGMT(parts[2],parts[0],parts[1])
+                                        match = "{0} {1}".format(correctedtime, parts[3])                                                                    
+                                    except:
+                                        match = match                                                        
                     else: # don't display color so we do normal replacement.
                         match = match.replace('Final -', 'FT -')
                         match = match.replace('Half -', 'HT -')
