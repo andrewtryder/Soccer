@@ -9,6 +9,7 @@
 import urllib2
 import re
 from BeautifulSoup import BeautifulSoup
+from itertools import groupby, izip, count
 import collections
 import string
 import unicodedata
@@ -36,6 +37,16 @@ class Soccer(callbacks.Plugin):
     def _remove_accents(self, data):
         nkfd_form = unicodedata.normalize('NFKD', unicode(data))
         return u"".join([c for c in nkfd_form if not unicodedata.combining(c)])
+
+    def _strip(self, string): # from http://bit.ly/X0vm6K
+        regex = re.compile("\x1f|\x02|\x12|\x0f|\x16|\x03(?:\d{1,2}(?:,\d{1,2})?)?", re.UNICODE)
+        return regex.sub('', string)
+
+    def _batch(self, iterable, size):
+        """http://code.activestate.com/recipes/303279/#c7"""
+        c = count()
+        for k, g in groupby(iterable, lambda x:c.next()//size):
+            yield g
     
     def _convertGMT(self, thetz, thetime, ampm):
         """Crude function to take TZ TIME AM/PM from scores to convert into GMT."""
@@ -57,7 +68,8 @@ class Soccer(callbacks.Plugin):
         """Return string containing tournament string if valid, 0 if error. If no tournament is given, return dict keys."""
         tournaments = { 'wcq-uefa':'fifa.worldq.uefa', 'intlfriendly':'fifa.friendly', 
                     'wcq-concacaf':'fifa.worldq.concacaf', 'wcq-conmebol':'fifa.worldq.conmebol',
-                    'ucl':'UEFA.CHAMPIONS', 'carling':'ENG.WORTHINGTON', 'europa':'UEFA.EUROPA'
+                    'ucl':'UEFA.CHAMPIONS', 'carling':'ENG.WORTHINGTON', 'europa':'UEFA.EUROPA',
+                    'facup':'ENG.FA'
                     }
         
         if tournament is None:
@@ -119,7 +131,7 @@ class Soccer(callbacks.Plugin):
             irc.reply("Failed to open %s" % url)
             return
         
-        soup = BeautifulSoup(html)
+        soup = BeautifulSoup(html,convertEntities=BeautifulSoup.HTML_ENTITIES,fromEncoding='utf-8')
         divs = soup.findAll('div', attrs={'class':'ind'})
 
         append_list = []
@@ -131,44 +143,39 @@ class Soccer(callbacks.Plugin):
                     match = match.getText().encode('utf-8') # do string formatting/color below. Ugly but it works.
                     match = match.replace('(ESPN, UK)','').replace('(ESPN3)','').replace('(ESPN2)','').replace('(ESPN, US)','') # remove TV.
                     
-                    #match = match.replace(' ET','').replace(' CT','').replace(' PT','')
-                    #match = self._remove_accents(match)
-                    
-                    if not self.registryValue('disableANSI', msg.args[0]): # display color or not?
-                        if not " vs " in match: # Colorize who is winning. so, skip over any future matches.
-                            parts = re.split("^(.*?)\s-\s(.*?)\s(\d+)-(\d+)\s(.*?)$", match) # regex for score.
-                            #self.log.info("{0} length: {1}".format(str(match), len(parts)))
-                            if len(parts) is 7:
-                                if parts[3] > parts[4]: # homeTeam winning.
-                                    match = "{0} - {1} {2}-{3} {4}".format(parts[1],ircutils.bold(parts[2]),ircutils.bold(parts[3]),parts[4],parts[5])
-                                elif parts[4] > parts[3]: #awayTeam winning.
-                                    match = "{0} - {1} {2}-{3} {4}".format(parts[1],parts[2],parts[3],ircutils.bold(parts[4]),ircutils.bold(parts[5]))
-                                else: # tied
-                                    match = "{0} - {1} {2}-{3} {4}".format(parts[1],parts[2],parts[3],parts[4],parts[5])                            
-
-                            # finish up by abbr/color
-                            match = match.replace('Final -',ircutils.mircColor('FT', 'red') + ' -')
-                            match = match.replace('Half -',ircutils.mircColor('HT', 'yellow') + ' -')
-                            match = match.replace('Postponed -',ircutils.mircColor('PP', 'yellow') + ' -')
-                        elif " vs " in match: # vs in match. String looks like: 11:45 AM - Stoke City vs Liverpool
-                            parts = match.split(' ', 3) # try to split into 4, ['11:45', 'AM', 'PT', '- Stoke City vs Liverpool']
-                            if len(parts) is 4: # see if the string split right.
-                                if parts[2] == "ET" or parts[2] == "CT" or parts[2] == "MT" or parts[2] == "PT": # last sanity check.
-                                    try:
-                                        correctedtime = self._convertGMT(parts[2],parts[0],parts[1])
-                                        match = "{0} {1}".format(correctedtime, parts[3])                                                                    
-                                    except:
-                                        match = match                                                        
-                    else: # don't display color so we do normal replacement.
-                        match = match.replace('Final -', 'FT -')
-                        match = match.replace('Half -', 'HT -')
-                        match = match.replace('Postponed -', 'PP -')
+                    if not " vs " in match: # Colorize who is winning. so, skip over any future matches.
+                        parts = re.split("^(.*?)\s-\s(.*?)\s(\d+)-(\d+)\s(.*?)$", match) # regex for score.
+                        if len(parts) is 7: # split to bold the winner.
+                            parts[2] = parts[2].strip() # clean up extra spaces in teams.
+                            parts[5] = parts[5].strip() # ibid.
+                            if parts[3] > parts[4]: # homeTeam winning.
+                                match = "{0} - {1} {2}-{3} {4}".format(parts[1],ircutils.bold(parts[2]),ircutils.bold(parts[3]),parts[4],parts[5])
+                            elif parts[4] > parts[3]: #awayTeam winning.
+                                match = "{0} - {1} {2}-{3} {4}".format(parts[1],parts[2],parts[3],ircutils.bold(parts[4]),ircutils.bold(parts[5]))
+                            else: # tied
+                                match = "{0} - {1} {2}-{3} {4}".format(parts[1],parts[2],parts[3],parts[4],parts[5])                            
+                        # finish up by abbr/color
+                        match = match.replace('Final -',ircutils.mircColor('FT', 'red') + ' -')
+                        match = match.replace('Half -',ircutils.mircColor('HT', 'yellow') + ' -')
+                        match = match.replace('Postponed -',ircutils.mircColor('PP', 'yellow') + ' -')
+                    elif " vs " in match: # vs in match. String looks like: 11:45 AM - Stoke City vs Liverpool
+                        parts = match.split(' ', 3) # try to split into 4, ['11:45', 'AM', 'PT', '- Stoke City vs Liverpool']
+                        if len(parts) is 4: # see if the string split right.
+                            if parts[2] == "ET" or parts[2] == "CT" or parts[2] == "MT" or parts[2] == "PT": # last sanity check.
+                                try:
+                                    correctedtime = self._convertGMT(parts[2],parts[0],parts[1])
+                                    match = "{0} {1}".format(correctedtime, parts[3])                                                                    
+                                except:
+                                    match = match                                                        
 
                     append_list.append(str(match).strip())
             
-        if len(append_list) > 0: # if more than 8.
-            descstring = string.join([item for item in append_list], " | ")
-            irc.reply(descstring)
+        if len(append_list) > 0: 
+            for N in self._batch(append_list, 8): # if more than 8.
+                if not self.registryValue('disableANSI', msg.args[0]):
+                    irc.reply("{0}".format(string.join([item for item in N], " | ")))
+                else:
+                    irc.reply("{0}".format(self._strip(string.join([item for item in N], " | "))))
         else:
             irc.reply("I did not find any matches going on for: %s" % leagueString)
                  
