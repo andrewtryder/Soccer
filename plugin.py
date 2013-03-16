@@ -82,7 +82,7 @@ class Soccer(callbacks.Plugin):
 
     def _validleagues(self, league=None):
         """Return string containing league string if valid, 0 if error. If no league given, return leagues as keys of dict."""
-        leagues = { 'mls':'usa.1', 'epl':'eng.1', 'laliga':'esp.1',
+        leagues = { 'mls':'usa.1', 'epl':'eng.1', 'laliga':'esp.1', 'npower-cship':'eng.2',
                     'seriea':'ita.1', 'bundesliga':'ger.1', 'ligue1':'fra.1',
                     'eredivisie':'ned.1', 'ligamx':'mex.1'
                   }
