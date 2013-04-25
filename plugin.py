@@ -67,12 +67,12 @@ class Soccer(callbacks.Plugin):
         """Return string containing tournament string if valid, 0 if error. If no tournament is given, return dict keys."""
 
         tournaments = {
-					'wcq-uefa': 'fifa.worldq.uefa', 'intlfriendly': 'fifa.friendly',
+                    'wcq-uefa': 'fifa.worldq.uefa', 'intlfriendly': 'fifa.friendly',
                     'wcq-concacaf': 'fifa.worldq.concacaf', 'wcq-conmebol': 'fifa.worldq.conmebol',
                     'ucl': 'UEFA.CHAMPIONS', 'carling': 'ENG.WORTHINGTON', 'europa': 'UEFA.EUROPA',
                     'facup': 'ENG.FA', 'knvbcup': 'NED.CUP', 'copadelray': 'ESP.COPA_DEL_REY',
-					'concacaf-cl': 'CONCACAF.CHAMPIONS'
-					}
+                    'concacaf-cl': 'CONCACAF.CHAMPIONS'
+                    }
 
         if tournament is None:
             return tournaments.keys()  # return the keys here for an list to display.
@@ -84,9 +84,11 @@ class Soccer(callbacks.Plugin):
 
     def _validleagues(self, league=None):
         """Return string containing league string if valid, 0 if error. If no league given, return leagues as keys of dict."""
-        leagues = { 'mls':'usa.1', 'epl':'eng.1', 'laliga':'esp.1', 'npower-cship':'eng.2',
-                    'seriea':'ita.1', 'bundesliga':'ger.1', 'ligue1':'fra.1',
-                    'eredivisie':'ned.1', 'ligamx':'mex.1'
+
+        leagues = {
+                'mls':'usa.1', 'epl':'eng.1', 'laliga':'esp.1', 'npower-cship':'eng.2',
+                'seriea':'ita.1', 'bundesliga':'ger.1', 'ligue1':'fra.1',
+                'eredivisie':'ned.1', 'ligamx':'mex.1'
                   }
 
         if league is None:
@@ -104,9 +106,9 @@ class Soccer(callbacks.Plugin):
     def soccer(self, irc, msg, args, optscore):
         """<league/tournament>
         Display live/completed scores for various leagues and tournaments.
+        Usage: leagues to display a list of leagues/tournaments.
         Ex: EPL
-		Usage: leagues to display a list of leagues/tournaments.
-		"""
+        """
 
         optscore = optscore.lower()
         leagueString = self._validleagues(league=optscore)
@@ -121,9 +123,9 @@ class Soccer(callbacks.Plugin):
                 urlString = tournamentString
         else:
             urlString = leagueString
-
+        # build url.
         url = self._b64decode('aHR0cDovL20uZXNwbi5nby5jb20vc29jY2VyL3Njb3JlYm9hcmQ/') + 'leagueTag=%s&lang=EN&wjb=' % (urlString)
-
+        # fetch url.
         try:
             req = urllib2.Request(url)
             html = (urllib2.urlopen(req)).read()
@@ -167,7 +169,7 @@ class Soccer(callbacks.Plugin):
                                     match = "{0} {1}".format(correctedtime, parts[3])
                                 except:
                                     match = match
-					# now we add the game in.
+                    # now we add the game in.
                     append_list.append(str(match).strip())
 
         if len(append_list) > 0:
@@ -195,7 +197,7 @@ class Soccer(callbacks.Plugin):
         leagueString = self._validleagues(league=optleague)
 
         if leagueString == "0":  # check for valid league.
-            irc.reply("Must specify league. Leagues is one of: %s" % (self._validleagues(league=None)))
+            irc.reply("ERROR: Must specify league. Leagues is one of: %s" % (self._validleagues(league=None)))
             return
 
         if optstat not in validstat:  # check for valid stat.
@@ -217,7 +219,7 @@ class Soccer(callbacks.Plugin):
             irc.reply("I did not find any statistics for: %s in %s" % (optstat, optleague))
             return
         # process html.
-        soup = BeautifulSoup(html)
+        soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
         table = soup.find('table', attrs={'class':'tablehead'})
         header = table.find('tr', attrs={'class':'colhead'}).findAll('td')
         rows = table.findAll('tr', attrs={'class':re.compile('(^odd|^even)row')})[0:5]  # int option
@@ -246,8 +248,9 @@ class Soccer(callbacks.Plugin):
     soccerstats = wrap(soccerstats, [('somethingWithoutSpaces'), ('somethingWithoutSpaces')])
 
     def soccertable(self, irc, msg, args, optleague):
-        """[league]
+        """<league>
         Display a league's table (standings).
+        Ex: bundesliga
         """
 
         optleague = optleague.lower()
@@ -258,15 +261,15 @@ class Soccer(callbacks.Plugin):
             return
 
         url = self._b64decode('aHR0cDovL3NvY2Nlcm5ldC5lc3BuLmdvLmNvbS90YWJsZXMvXy9sZWFndWU=') + '/%s/' % leagueString
-		# fetch url
+        # fetch url
         try:
             req = urllib2.Request(url)
             html = (urllib2.urlopen(req)).read()
         except:
             irc.reply("ERROR: Failed to open: %s" % url)
             return
-		# now process html.
-        soup = BeautifulSoup(html)
+        # now process html.
+        soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
         tables = soup.findAll('table', attrs={'class':'tablehead'})
         for table in tables:  # must do this because of MLS
             # header = table.find('tr', attrs={'class':'colhead'}).findAll('td')
@@ -275,26 +278,26 @@ class Soccer(callbacks.Plugin):
             if titleSpan:
                 titleSpan.extract()
             rows = table.findAll('tr', attrs={'align':'right'})[1:]  # int option
-			# list for output.
+            # list for output.
             append_list = []
-			# each row is a team.
+            # each row is a team.
             for row in rows:
                 tds = row.findAll('td')
                 rank = tds[0]
                 movement = tds[1].find('img')['src']
-                team = tds[2]
-                # gd = tds[-2]
+                team = self._remove_accents(tds[2].getText()) #.encode('utf-8')
                 pts = tds[-1]
                 if "up_arrow" in movement:  # moving up.
-                    appendString = (rank.getText() + ". " + self._remove_accents(team.getText()) + " " + pts.getText())
+                    appendString = (rank.getText() + ". " + team + " " + pts.getText())
                 elif "down_arrow" in movement:  # lost points.
-                    appendString = (rank.getText() + ". " + self._remove_accents(team.getText()) + " " + pts.getText())
+                    appendString = (rank.getText() + ". " + team + " " + pts.getText())
                 else:  # draw/inactive.
-                    appendString = (rank.getText() + ". " + self._remove_accents(team.getText()) + " " + pts.getText())
+                    appendString = (rank.getText() + ". " + team + " " + pts.getText())
                 append_list.append(appendString)
 
-			# prepare to output.
-            title = self._remove_accents(title.getText().strip().replace('\r\n', ''))
+            # prepare to output.
+            #title = self._remove_accents(title.getText().strip().replace('\r\n', ''))
+            title = title.getText().strip().encode('utf-8').replace('\r\n', '')
             if not self.registryValue('disableANSI', msg.args[0]):
                 descstring = " | ".join([item for item in append_list])
                 output = "{0} :: {1}".format(ircutils.bold(title), descstring)
