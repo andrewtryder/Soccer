@@ -35,10 +35,10 @@ class Soccer(callbacks.Plugin):
         return base64.b64decode(string)
 
     def _remove_accents(self, data):
-		"""Clean up accented team names so we can print."""
+        """Clean up accented team names so we can print."""
 
-		nkfd_form = unicodedata.normalize('NFKD', unicode(data))
-		return u"".join([c for c in nkfd_form if not unicodedata.combining(c)])
+        nkfd_form = unicodedata.normalize('NFKD', unicode(data))
+        return u"".join([c for c in nkfd_form if not unicodedata.combining(c)])
 
     def _batch(self, iterable, size):
         """http://code.activestate.com/recipes/303279/#c7"""
@@ -75,7 +75,7 @@ class Soccer(callbacks.Plugin):
                     }
 
         if tournament is None:
-            return tournaments.keys()  # return the keys here for an list to display.
+            return sorted(tournaments.keys())  # return the keys here for an list to display.
         else:
             if tournament not in tournaments:
                 return "0"  # to parse an error.
@@ -87,12 +87,13 @@ class Soccer(callbacks.Plugin):
 
         leagues = {
                 'mls':'usa.1', 'epl':'eng.1', 'laliga':'esp.1', 'npower-cship':'eng.2',
-                'seriea':'ita.1', 'bundesliga':'ger.1', 'ligue1':'fra.1',
-                'eredivisie':'ned.1', 'ligamx':'mex.1'
+                'seriea':'ita.1', 'bundesliga':'ger.1', 'ligue1':'fra.1', 'turkish':'tur.1',
+                'eredivisie':'ned.1', 'ligamx':'mex.1', 'austrian':'aut.1', 'belgian':'bel.1',
+                'danish':'den.1', 'portuguese':'por.1', '2bundesliga':'ger.2', 'russian':'rus.1'
                   }
 
         if league is None:
-            return leagues.keys()  # return the keys here for an list to display.
+            return sorted(leagues.keys())  # return the keys here for an list to display.
         else:
             if league not in leagues:
                 return "0"  # to parse an error.
