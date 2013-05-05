@@ -11,6 +11,7 @@ import re
 from BeautifulSoup import BeautifulSoup
 from itertools import groupby, count
 import unicodedata
+from collections import defaultdict
 import base64  # b64decode
 import pytz, datetime  # convertGMT
 
@@ -183,6 +184,83 @@ class Soccer(callbacks.Plugin):
             irc.reply("I did not find any matches going on for: %s" % leagueString)
 
     soccer = wrap(soccer, [('somethingWithoutSpaces')])
+
+    def _sanitizeName(self, optname):
+        """return a sanitized name so matching is easier."""
+
+        optname = optname.lower()  # lower because case sucks.
+        optname = optname.replace('.', '')  # remove periods.
+        return optname
+
+    def soccerlineup(self, irc, msg, args, optteam):
+        """<team>
+        Display lineup for team.
+        Ex: Real Madrid
+        """
+
+        optteam = self._sanitizeName(optteam)  # sanitize input.
+
+        # fetch scoreboard here.
+        url = self._b64decode('aHR0cDovL20uZXNwbi5nby5jb20vc29jY2VyL3Njb3JlYm9hcmQ/bGFuZz1FTiZ3amI9')
+        request = urllib2.Request(url)
+        response = (urllib2.urlopen(request))
+        # process html.
+        soup = BeautifulSoup(response.read())
+        games = soup.findAll('div', attrs={'style':'white-space: nowrap;'})
+        # k,v where the key is the name of the team. value is match id.
+        matches = {} #collections.defaultdict(list)
+        # for each match, filter.
+        for game in games:
+            if game.find('a', attrs={'href':re.compile('^gamecast.*')}):  # only matches.
+                match = game.getText()  # text so we can regex below.
+                parts = re.split("^.*?\s-\s(.*?)\s(?:vs|\d+-\d+|P-P)\s(.*?)$", match, re.UNICODE)
+                gameid = game.find('a')['href']  # find the gameid.
+                gameid = gameid.replace('gamecast?gameId=', '').replace('&lang=EN&wjb=', '')  # strip.
+                if len(parts) == 4:  # sanity check.
+                    matches[self._sanitizeName(parts[1])] = gameid
+                    matches[self._sanitizeName(parts[2])] = gameid
+        # now, fetch the matchid.
+        optmatch = matches.get(optteam)
+        if not optmatch:  # we did not find a matching team.
+            irc.reply("ERROR: I did not find any matches with '{0}' in them playing.")
+            return
+        else:  # we did find a match. lets continue.
+            # construct url with matchid.
+            url = self._b64decode('aHR0cDovL20uZXNwbi5nby5jb20vc29jY2VyL2dhbWVjYXN0P2dhbWVJZD0=') + '%s&action=summary&lang=EN&wjb=' % optmatch
+            self.log.info(url)
+            request = urllib2.Request(url)
+            response = (urllib2.urlopen(request))
+            soup = BeautifulSoup(response.read())
+            link = soup.find('a', attrs={'class':'white'}, text='LINEUPS')
+            if not link:  # test for link.
+                irc.reply("ERROR: I did not find a lineup for {0}. Either the match was suspended, check closer to gametime or no lineups given.".format(optteam))
+                return
+            # found link so find the table with lineups.
+            table = link.findNext('table', attrs={'class':'stats', 'cellpadding':'3', 'cellspacing':'0'})
+            rows = table.findAll('tr')
+            # our datacontainer here.
+            lineupteams = []
+            lineup = defaultdict(list)
+            lineupsubs = defaultdict(list)
+            # each "row" is a player in the table.
+            for i, row in enumerate(rows):
+                if i == 0:  # handle the first row, which is the teams.
+                    tds = row.findAll('td')
+                    for td in tds:  # should always be two here.
+                        lineupteams.append(td.getText())  # populate the list with the two teams (0, 1)
+                else:  # each other rows, which are players.
+                    divs = row.findAll('div', attrs={'style':'white-space: nowrap;'})  # two divs
+                    for y, div in enumerate(divs):  # enumerate so we can ref lineup teams.
+                        if row.findPrevious('td', attrs={'align':'center'}, text='Substitutes'):  # is it a sub?
+                            lineupsubs[lineupteams[y]].append(div.getText().encode('utf-8'))
+                        else:  # non-subs.
+                            lineup[lineupteams[y]].append(div.getText().encode('utf-8'))
+
+            # output time.
+            for team in lineupteams:
+                irc.reply("{0} lineup :: {1} :: SUBS :: {2}".format(team, " | ".join(lineup[team]), " | ".join(lineupsubs[team])))
+
+    soccerlineup = wrap(soccerlineup, [('text')])
 
     def soccerstats(self, irc, msg, args, optleague, optstat):
         """<league> <goals|assists|cards|fairplay>
