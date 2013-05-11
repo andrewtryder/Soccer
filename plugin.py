@@ -64,6 +64,14 @@ class Soccer(callbacks.Plugin):
         utc_dt = local_dt.astimezone(pytz.utc)
         return utc_dt.strftime("%H:%M")
 
+    def _sanitizeName(self, optname):
+        """return a sanitized name so matching is easier."""
+
+        optname = optname.lower()  # lower because case sucks.
+        optname = optname.replace('.', '')  # remove periods.
+        optname = optname.strip()  # remove spaces on the outside
+        return optname
+
     def _validtournaments(self, tournament=None):
         """Return string containing tournament string if valid, 0 if error. If no tournament is given, return dict keys."""
 
@@ -90,7 +98,8 @@ class Soccer(callbacks.Plugin):
                 'mls':'usa.1', 'epl':'eng.1', 'laliga':'esp.1', 'npower-cship':'eng.2',
                 'seriea':'ita.1', 'bundesliga':'ger.1', 'ligue1':'fra.1', 'turkish':'tur.1',
                 'eredivisie':'ned.1', 'ligamx':'mex.1', 'austrian':'aut.1', 'belgian':'bel.1',
-                'danish':'den.1', 'portuguese':'por.1', '2bundesliga':'ger.2', 'russian':'rus.1'
+                'danish':'den.1', 'portuguese':'por.1', '2bundesliga':'ger.2', 'russian':'rus.1',
+                'scottish':'sco.1'
                   }
 
         if league is None:
@@ -184,14 +193,6 @@ class Soccer(callbacks.Plugin):
             irc.reply("I did not find any matches going on for: %s" % leagueString)
 
     soccer = wrap(soccer, [('somethingWithoutSpaces')])
-
-    def _sanitizeName(self, optname):
-        """return a sanitized name so matching is easier."""
-
-        optname = optname.lower()  # lower because case sucks.
-        optname = optname.replace('.', '')  # remove periods.
-        optname = optname.strip()  # remove spaces on the outside
-        return optname
 
     def soccerlineup(self, irc, msg, args, optteam):
         """<team>
