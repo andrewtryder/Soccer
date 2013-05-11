@@ -190,6 +190,7 @@ class Soccer(callbacks.Plugin):
 
         optname = optname.lower()  # lower because case sucks.
         optname = optname.replace('.', '')  # remove periods.
+        optname = optname.strip()  # remove spaces on the outside
         return optname
 
     def soccerlineup(self, irc, msg, args, optteam):
@@ -213,6 +214,7 @@ class Soccer(callbacks.Plugin):
         for game in games:
             if game.find('a', attrs={'href':re.compile('^gamecast.*')}):  # only matches.
                 match = game.getText()  # text so we can regex below.
+                match = match.replace('(ESPN, UK)','').replace('(ESPN3)','').replace('(ESPN2)','').replace('(ESPN, US)','')  # remove manually
                 parts = re.split("^.*?\s-\s(.*?)\s(?:vs|\d+-\d+|P-P)\s(.*?)$", match, re.UNICODE)
                 gameid = game.find('a')['href']  # find the gameid.
                 gameid = gameid.replace('gamecast?gameId=', '').replace('&lang=EN&wjb=', '')  # strip.
@@ -222,7 +224,7 @@ class Soccer(callbacks.Plugin):
         # now, fetch the matchid.
         optmatch = matches.get(optteam)
         if not optmatch:  # we did not find a matching team.
-            irc.reply("ERROR: I did not find any matches with '{0}' in them playing.")
+            irc.reply("ERROR: I did not find any matches with '{0}' in them playing. Spelled wrong? Missing accent?".format(optteam))
             return
         else:  # we did find a match. lets continue.
             # construct url with matchid.
