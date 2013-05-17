@@ -79,7 +79,7 @@ class Soccer(callbacks.Plugin):
                     'wcq-uefa': 'fifa.worldq.uefa', 'intlfriendly': 'fifa.friendly',
                     'wcq-concacaf': 'fifa.worldq.concacaf', 'wcq-conmebol': 'fifa.worldq.conmebol',
                     'ucl': 'UEFA.CHAMPIONS', 'carling': 'ENG.WORTHINGTON', 'europa': 'UEFA.EUROPA',
-                    'facup': 'ENG.FA', 'knvbcup': 'NED.CUP', 'copadelray': 'ESP.COPA_DEL_REY',
+                    'facup': 'ENG.FA', 'knvbcup': 'NED.CUP', 'copadelrey': 'ESP.COPA_DEL_REY',
                     'concacaf-cl': 'CONCACAF.CHAMPIONS'
                     }
 
