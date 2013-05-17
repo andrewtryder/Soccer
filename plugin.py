@@ -250,14 +250,15 @@ class Soccer(callbacks.Plugin):
                 if i == 0:  # handle the first row, which is the teams.
                     tds = row.findAll('td')
                     for td in tds:  # should always be two here.
-                        lineupteams.append(td.getText())  # populate the list with the two teams (0, 1)
+                        lineupteams.append(td.getText().encode('utf-8'))  # populate the list with the two teams (0, 1)
                 else:  # each other rows, which are players.
                     divs = row.findAll('div', attrs={'style':'white-space: nowrap;'})  # two divs
                     for y, div in enumerate(divs):  # enumerate so we can ref lineup teams.
+                        pn = self._remove_accents(div.getText())
                         if row.findPrevious('td', attrs={'align':'center'}, text='Substitutes'):  # is it a sub?
-                            lineupsubs[lineupteams[y]].append(div.getText().encode('utf-8'))
+                            lineupsubs[lineupteams[y]].append(pn.encode('utf-8'))
                         else:  # non-subs.
-                            lineup[lineupteams[y]].append(div.getText().encode('utf-8'))
+                            lineup[lineupteams[y]].append(pn.encode('utf-8'))
 
             # output time.
             for team in lineupteams:
