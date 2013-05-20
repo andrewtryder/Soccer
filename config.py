@@ -21,7 +21,8 @@ def configure(advanced):
 
 
 Soccer = conf.registerPlugin('Soccer')
+conf.registerGlobalValue(Soccer, 'logURLs', registry.Boolean(True, """Should we log all URL calls?"""))
 conf.registerChannelValue(Soccer, 'disableANSI', registry.Boolean(False, """Do not display any ANSI (color/bold) for channel."""))
-
+conf.registerChannelValue(Soccer, 'adjustTZ', registry.Boolean(True, """Adjust timezone per match depending on the league/tournament."""))
 
 # vim:set shiftwidth=4 tabstop=4 expandtab textwidth=250:

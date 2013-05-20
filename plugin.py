@@ -236,11 +236,11 @@ class Soccer(callbacks.Plugin):
                     match = match.replace('Postponed -', ircutils.mircColor('PP', 'yellow') + ' -')
                 elif " vs " in match:  # match not started. String looks like: ['11:45', 'AM', 'PT', '- Stoke City vs Liverpool']
                     parts = match.split(' ', 3)  # try to split into 4. worst case we get an error and fix it manually.
-                    if parts[2] in ["ET", "PT"]:  # so far, I've only seen ET and PT given (cookie stores the TZ otherwise).
+                    if parts[2] in ["ET", "PT"] and self.registryValue('adjustTZ', msg.args[0]):  # must be ET+PT and adjustTZ on in config.
                         adjustedtime = self._convertTZ(parts[2], parts[0], parts[1], tzstring)  # '11:45', 'AM', 'PT', 'league/tournament'
-                        match = "{0} {1}".format(adjustedtime, parts[3])
-                    else:  # timestring is not ET.
-                        match = "{0} {1}".format(parts[0], parts[3])
+                        match = "{0} {1}".format(adjustedtime, parts[3])  # HH:mm - Match
+                    else:  # timestring is not ET/PT or we don't want to adjustTZ config.
+                        match = "{0} {1}".format(parts[0], parts[3])  # HH:mm - Match
                 # now we add the game in. strip the extras.
                 append_list.append(match.strip())
         # output time. if we have teamstring, only display what we match.
