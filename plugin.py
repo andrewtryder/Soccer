@@ -251,7 +251,7 @@ class Soccer(callbacks.Plugin):
                     outlist.append(item)  # add into our list.
             # now that we have matching items, check length and output differently.
             if len(outlist) == 0:  # no matches found.
-                irc.reply("ERROR: I did not find anything for: {0}. Valid leagues and tournaments: {1}".format(teamstring, validkeys))
+                irc.reply("ERROR: I did not find anything for: '{0}'. To see valid leagues and tournaments, issue 'leagues' as argument.".format(teamstring))
             elif 1 <= len(outlist) <= 5:  # we have between 1-5 matching items.
                 irc.reply("{0}".format(" | ".join([item for item in outlist])))
             else:   # more than 5, so take first five, print, and relay error.
