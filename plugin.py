@@ -59,9 +59,13 @@ class Soccer(callbacks.Plugin):
     def _convertTZ(self, origtz, thetime, ampm, optsport):
         """Crude function to take local AM/PM time and convert into GMT or others (24hr)."""
 
-        # base zones. we get this based on the IP.
+        # base zones.
         if origtz == "ET":
             local = pytz.timezone("US/Eastern")
+        elif origtz == "CT":
+            local = pytz.timezone("US/Central")
+        elif origtz == "MT":
+            local = pytz.timezone("US/Mountain")
         elif origtz == "PT":
             local = pytz.timezone("US/Pacific")
 
@@ -236,7 +240,7 @@ class Soccer(callbacks.Plugin):
                     match = match.replace('Postponed -', ircutils.mircColor('PP', 'yellow') + ' -')
                 elif " vs " in match:  # match not started. String looks like: ['11:45', 'AM', 'PT', '- Stoke City vs Liverpool']
                     parts = match.split(' ', 3)  # try to split into 4. worst case we get an error and fix it manually.
-                    if parts[2] in ["ET", "PT"] and self.registryValue('adjustTZ', msg.args[0]):  # must be ET+PT and adjustTZ on in config.
+                    if parts[2] in ["ET", "CT", "MT", "PT"] and self.registryValue('adjustTZ', msg.args[0]):  # must be ET+PT and adjustTZ on in config.
                         adjustedtime = self._convertTZ(parts[2], parts[0], parts[1], tzstring)  # '11:45', 'AM', 'PT', 'league/tournament'
                         match = "{0} {1}".format(adjustedtime, parts[3])  # HH:mm - Match
                     else:  # timestring is not ET/PT or we don't want to adjustTZ config.
