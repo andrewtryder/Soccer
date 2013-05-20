@@ -1,20 +1,20 @@
 # -*- coding: utf-8 -*-
 ###
-# Copyright (c) 2013, spline
+# Copyright (c) 2012-2013, spline
 # All rights reserved.
 #
 #
 ###
 
-import urllib2
+# my libs.
 import re
 from BeautifulSoup import BeautifulSoup
-from itertools import groupby, count
 import unicodedata
 from collections import defaultdict
 import base64  # b64decode
-import pytz, datetime  # convertGMT
+import pytz, datetime  # convertTZ
 
+# supybot libs.
 import supybot.utils as utils
 from supybot.commands import *
 import supybot.plugins as plugins
@@ -41,27 +41,42 @@ class Soccer(callbacks.Plugin):
         nkfd_form = unicodedata.normalize('NFKD', unicode(data))
         return u"".join([c for c in nkfd_form if not unicodedata.combining(c)])
 
-    def _batch(self, iterable, size):
-        """http://code.activestate.com/recipes/303279/#c7"""
+    def _splicegen(self, maxchars, stringlist):
+        """Return a group of splices from a list based on the maxchars string-length boundary."""
 
-        c = count()
-        for k, g in groupby(iterable, lambda x:c.next()//size):
-            yield g
+        runningcount = 0
+        tmpslice = []
+        for i, item in enumerate(stringlist):
+            runningcount += len(item)
+            if runningcount <= int(maxchars):
+                tmpslice.append(i)
+            else:
+                yield tmpslice
+                tmpslice = [i]
+                runningcount = len(item)
+        yield(tmpslice)
 
-    def _convertGMT(self, thetz, thetime, ampm):
-        """Crude function to take TZ TIME AM/PM from scores to convert into GMT."""
+    def _convertTZ(self, origtz, thetime, ampm, optsport):
+        """Crude function to take local AM/PM time and convert into GMT or others (24hr)."""
 
-        if thetz == "PT":
-            local = pytz.timezone("America/Los_Angeles")
-        elif thetz == "MT":
-            local = pytz.timezone("America/Denver")
-        elif thetz == "CT":
-            local = pytz.timezone("America/Chicago")
-        elif thetz == "ET":
-            local = pytz.timezone("America/New_York")
+        # base zones. we get this based on the IP.
+        if origtz == "ET":
+            local = pytz.timezone("US/Eastern")
+        elif origtz == "PT":
+            local = pytz.timezone("US/Pacific")
+
+        # table for conversion depending on leagues.
+        tztable = {'mls':'US/Eastern', 'epl':'Europe/London'}
+
+        # going "from" here.
         naive = datetime.datetime.strptime(thetime + " " + ampm, "%I:%M %p")
         local_dt = local.localize(naive, is_dst=None)
-        utc_dt = local_dt.astimezone(pytz.utc)
+        if optsport in tztable:  # use tztable above for string.
+            tzstring = tztable[optsport]  # conv based on league. table is above.
+        else:  # default to GMT.
+            tzstring = 'Europe/London'
+        utc_dt = local_dt.astimezone(pytz.timezone(tzstring)) # convert from utc->local(tzstring).
+        # return 24hr.
         return utc_dt.strftime("%H:%M")
 
     def _sanitizeName(self, optname):
@@ -72,42 +87,85 @@ class Soccer(callbacks.Plugin):
         optname = optname.strip()  # remove spaces on the outside
         return optname
 
-    def _validtournaments(self, tournament=None):
-        """Return string containing tournament string if valid, 0 if error. If no tournament is given, return dict keys."""
+    def _httpget(self, url, h=None, d=None, l=True):
+        """General HTTP resource fetcher. Pass headers via h, data via d, and to log via l."""
 
-        tournaments = {
-                    'wcq-uefa': 'fifa.worldq.uefa', 'intlfriendly': 'fifa.friendly',
-                    'wcq-concacaf': 'fifa.worldq.concacaf', 'wcq-conmebol': 'fifa.worldq.conmebol',
-                    'ucl': 'UEFA.CHAMPIONS', 'carling': 'ENG.WORTHINGTON', 'europa': 'UEFA.EUROPA',
-                    'facup': 'ENG.FA', 'knvbcup': 'NED.CUP', 'copadelrey': 'ESP.COPA_DEL_REY',
-                    'concacaf-cl': 'CONCACAF.CHAMPIONS'
-                    }
+        if self.registryValue('logURLs') and l:
+            self.log.info(url)
 
-        if tournament is None:
-            return sorted(tournaments.keys())  # return the keys here for an list to display.
-        else:
-            if tournament not in tournaments:
-                return "0"  # to parse an error.
+        try:
+            if h and d:
+                page = utils.web.getUrl(url, headers=h, data=d)
             else:
+                page = utils.web.getUrl(url)
+            return page
+        except utils.web.Error as e:
+            self.log.error("ERROR opening {0} message: {1}".format(url, e))
+            return None
+
+    ################################
+    # LEAGUE AND TOURNAMENT TABLES #
+    ################################
+
+    def _validtournaments(self, tournament=None):
+        """Return string containing tournament string if valid, None if error. If no tournament is given, return dict keys."""
+
+        tournaments = { 'wcq-uefa':['fifa.worldq.uefa', 'CET'],
+                        'intlfriendly':['fifa.friendly', 'US/Eastern'],
+                        'wcq-concacaf':['fifa.worldq.concacaf', 'US/Eastern'],
+                        'wcq-conmebol':['fifa.worldq.conmebol', 'US/Eastern'],
+                        'ucl':['UEFA.CHAMPIONS', 'CET'],
+                        'carling':['ENG.WORTHINGTON', 'GMT'],
+                        'europa':['UEFA.EUROPA', 'CET'],
+                        'facup':['ENG.FA', 'GMT'],
+                        'knvbcup':['NED.CUP', 'CET'],
+                        'copadelrey':['ESP.COPA_DEL_REY', 'CET'],
+                        'concacaf-cl':['CONCACAF.CHAMPIONS', 'US/Eastern'],
+                        'goldcup':['concacaf.gold', 'US/Eastern'],
+                        'coppaitalia':['ita.coppa_italia', 'CET'],
+                        'dfbcup':['ger.dfb_pokal', 'CET'] }
+
+        # check input. if None, return keys. Else, check for key/value match.
+        if not tournament:  # if no tournament, return the keys.
+            return " | ".join(sorted(tournaments.keys()))
+        else:  # check for tournament.
+            if tournament not in tournaments:  # not found.
+                return None  # no tournament found.
+            else:  # return the value from key.
                 return tournaments[tournament]
 
     def _validleagues(self, league=None):
-        """Return string containing league string if valid, 0 if error. If no league given, return leagues as keys of dict."""
+        """Return string containing league string if valid, None if error. If no league given, return leagues as keys of dict."""
 
-        leagues = {
-                'mls':'usa.1', 'epl':'eng.1', 'laliga':'esp.1', 'npower-cship':'eng.2',
-                'seriea':'ita.1', 'bundesliga':'ger.1', 'ligue1':'fra.1', 'turkish':'tur.1',
-                'eredivisie':'ned.1', 'ligamx':'mex.1', 'austrian':'aut.1', 'belgian':'bel.1',
-                'danish':'den.1', 'portuguese':'por.1', '2bundesliga':'ger.2', 'russian':'rus.1',
-                'scottish':'sco.1'
-                  }
+        leagues = { 'mls':['usa.1', 'US/Eastern'],
+                    'epl':['eng.1', 'GMT'],
+                    'laliga':['esp.1', 'CET'],
+                    'npower-cship':['eng.2', 'GMT'],
+                    'seriea':['ita.1', 'CET'],
+                    'bundesliga':['ger.1', 'CET'],
+                    'ligue1':['fra.1', 'CET'],
+                    'turkish':['tur.1', 'EET'],
+                    'eredivisie':['ned.1', 'CET'],
+                    'ligamx':['mex.1', 'US/Eastern'],
+                    'austrian':['aut.1', 'CET'],
+                    'belgian':['bel.1', 'CET'],
+                    'danish':['den.1', 'CET'],
+                    'portuguese':['por.1', 'WET'],
+                    '2spain':['esp.2', 'CET'],
+                    '2bundesliga':['ger.2', 'CET'],
+                    'allsvenskanliga':['swe.1', 'CET'],
+                    'danish':['den.1', 'CET'],
+                    'russian':['rus.1','Europe/Moscow'],
+                    'scottish':['sco.1', 'GMT'],
+                    'argentina':['arg.1', 'America/Argentina/Buenos_Aires'] }
 
-        if league is None:
-            return sorted(leagues.keys())  # return the keys here for an list to display.
-        else:
-            if league not in leagues:
-                return "0"  # to parse an error.
-            else:
+        # check input. if None, return keys. Else, check for key/value match.
+        if not league:  # if no league, return the keys.
+            return " | ".join(sorted(leagues.keys()))
+        else:  # check for league.
+            if league not in leagues:  # not found.
+                return None  # no league found.
+            else:  # return the value from key.
                 return leagues[league]
 
     ####################
@@ -118,81 +176,98 @@ class Soccer(callbacks.Plugin):
         """<league/tournament>
         Display live/completed scores for various leagues and tournaments.
         Usage: leagues to display a list of leagues/tournaments.
-        Ex: EPL
+        Ex: EPL or leagues
         """
 
-        optscore = optscore.lower()
-        leagueString = self._validleagues(league=optscore)
-
-        if leagueString == "0":  # look for leagues first.
-            tournamentString = self._validtournaments(tournament=optscore)
-            if tournamentString == "0":  # if not a league, you need a tournament.
-                keys = self._validleagues(league=None) + self._validtournaments(tournament=None)
-                irc.reply("ERROR: Must specify a valid league or tournament: %s" % (keys))
-                return
-            else:
-                urlString = tournamentString
-        else:
-            urlString = leagueString
-        # build url.
-        url = self._b64decode('aHR0cDovL20uZXNwbi5nby5jb20vc29jY2VyL3Njb3JlYm9hcmQ/') + 'leagueTag=%s&lang=EN&wjb=' % (urlString)
-        # fetch url.
-        try:
-            req = urllib2.Request(url)
-            html = (urllib2.urlopen(req)).read()
-        except:
-            irc.reply("ERROR: Failed to open: %s" % url)
+        # first, check if we're looking for a league or tournament and setup variables.
+        optscore, teamstring = optscore.lower(), None  # lower optscore, setup empty teamstring.
+        validkeys = "{0} | {1}".format(self._validleagues(league=None), self._validtournaments(tournament=None))  # use for later.
+        if optscore == "leagues" or optscore == "help":  # someone wants the leagues/tournament keys.
+            irc.reply("Valid leagues and tournaments are: {0}".format(validkeys))
             return
-
+        else:  # search leagues->tournaments-> looking for a team.
+            leaguestring = self._validleagues(league=optscore)  # check for a league.
+            if not leaguestring:  # no league found.
+                tournamentstring = self._validtournaments(tournament=optscore)  # check for a tournament.
+                if not tournamentstring:  # no tournament found.
+                    teamstring = optscore  # must be looking for a team.
+        # now, based on above, we setup our url and tzstring.
+        if leaguestring:  # if we're looking for a league.
+            url = self._b64decode('aHR0cDovL20uZXNwbi5nby5jb20vc29jY2VyL3Njb3JlYm9hcmQ/') + 'leagueTag=%s&lang=EN&wjb=' % leaguestring[0]
+            tzstring = leaguestring[1]
+        elif not leaguestring and tournamentstring:  # no league string.
+            url = self._b64decode('aHR0cDovL20uZXNwbi5nby5jb20vc29jY2VyL3Njb3JlYm9hcmQ/') + 'leagueTag=%s&lang=EN&wjb=' % tournamentstring[0]
+            tzstring = tournamentstring[1]
+        else:  # generic url (search with teamstring)
+            url = self._b64decode('aHR0cDovL20uZXNwbi5nby5jb20vc29jY2VyL3Njb3JlYm9hcmQ/Jmxhbmc9RU4md2piPQ==')
+            tzstring = 'US/Eastern'
+        # fetch url.
+        html = self._httpget(url)
+        if not html:
+            irc.reply("ERROR: Failed to fetch {0}.".format(url))
+            self.log.error("ERROR opening {0}".format(url))
+            return
+        # process html.
         soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
         divs = soup.findAll('div', attrs={'class':'ind'})
-
-        append_list = []  # container for output.
-
+        # container for output.
+        append_list = []
+        # each div is a container for games.
         for div in divs:
-            if div.find('div', attrs={'style':'white-space: nowrap;'}):
+            if div.find('div', attrs={'style':'white-space: nowrap;'}):  # each of these are games.
                 match = div.find('div', attrs={'style':'white-space: nowrap;'})
-                if match:
-                    match = match.getText().encode('utf-8')  # do string formatting/color below. Ugly but it works.
-                    match = match.replace('(ESPN, UK)','').replace('(ESPN3)','').replace('(ESPN2)','').replace('(ESPN, US)','')  # remove TV.
+                match = match.getText().encode('utf-8')  # do string formatting/color. encode.
+                match = match.split('(', 1)[0]  # easier to strip out the tv stuff.
+                # now, we're left with the text. two conditionals for game started or not.
+                if not " vs " in match:  # Match has started.
+                    parts = re.split("^(.*?)\s-\s(.*?)\s(\d+)-(\d+)\s(.*?)$", match)  # regex for score.
+                    if len(parts) is 7:  # split to bold the winner.
+                        parts[2] = parts[2].strip()  # clean up extra spaces in teams.
+                        parts[5] = parts[5].strip()  # ibid.
+                        if parts[3] > parts[4]:  # bold winner: homeTeam winning.
+                            match = "{0} - {1} {2}-{3} {4}".format(parts[1], ircutils.bold(parts[2]), ircutils.bold(parts[3]), parts[4], parts[5])
+                        elif parts[4] > parts[3]:  # bold winner: awayTeam winning.
+                            match = "{0} - {1} {2}-{3} {4}".format(parts[1], parts[2], parts[3], ircutils.bold(parts[4]), ircutils.bold(parts[5]))
+                        else:  # tied. no bold
+                            match = "{0} - {1} {2}-{3} {4}".format(parts[1], parts[2], parts[3], parts[4], parts[5])
+                    # finish up by abbr/color. this is also parts[1]
+                    match = match.replace('Final -', ircutils.mircColor('FT', 'red') + ' -')
+                    match = match.replace('Half -', ircutils.mircColor('HT', 'yellow') + ' -')
+                    match = match.replace('Postponed -', ircutils.mircColor('PP', 'yellow') + ' -')
+                elif " vs " in match:  # match not started. String looks like: ['11:45', 'AM', 'PT', '- Stoke City vs Liverpool']
+                    parts = match.split(' ', 3)  # try to split into 4. worst case we get an error and fix it manually.
+                    if parts[2] in ["ET", "PT"]:  # so far, I've only seen ET and PT given (cookie stores the TZ otherwise).
+                        adjustedtime = self._convertTZ(parts[2], parts[0], parts[1], tzstring)  # '11:45', 'AM', 'PT', 'league/tournament'
+                        match = "{0} {1}".format(adjustedtime, parts[3])
+                    else:  # timestring is not ET.
+                        match = "{0} {1}".format(parts[0], parts[3])
+                # now we add the game in. strip the extras.
+                append_list.append(match.strip())
+        # output time. if we have teamstring, only display what we match.
+        if teamstring:  # looking for a specific game/score
+            outlist = []  # container for output.
+            for item in append_list:  # iterate through our matches.
+                if teamstring in item.lower():  # if we match item inside.
+                    outlist.append(item)  # add into our list.
+            # now that we have matching items, check length and output differently.
+            if len(outlist) == 0:  # no matches found.
+                irc.reply("ERROR: I did not find anything for: {0}. Valid leagues and tournaments: {1}".format(teamstring, validkeys))
+            elif 1 <= len(outlist) <= 5:  # we have between 1-5 matching items.
+                irc.reply("{0}".format(" | ".join([item for item in outlist])))
+            else:   # more than 5, so take first five, print, and relay error.
+                irc.reply("{0}".format(" | ".join([item for item in outlist[0:5]])))
+                irc.reply("I found too many matches for '{0}'. Try something more specific.".format(teamstring))
+        else:  # regular output for tournament/leagues.
+            if len(append_list) < 1:  # no games.
+                irc.reply("Sorry, I did not find any matches going on in: {0}".format(optscore))
+            else:  # we have games.
+                for splice in self._splicegen('380', append_list):
+                    if not self.registryValue('disableANSI', msg.args[0]):
+                        irc.reply(" | ".join([append_list[item] for item in splice]))
+                    else:
+                        irc.reply(" | ".join([ircutils.stripFormatting(append_list[item]) for item in splice]))
 
-                    if not " vs " in match:  # Match has started.
-                        parts = re.split("^(.*?)\s-\s(.*?)\s(\d+)-(\d+)\s(.*?)$", match)  # regex for score.
-                        if len(parts) is 7:  # split to bold the winner.
-                            parts[2] = parts[2].strip()  # clean up extra spaces in teams.
-                            parts[5] = parts[5].strip()  # ibid.
-                            if parts[3] > parts[4]:  # homeTeam winning.
-                                match = "{0} - {1} {2}-{3} {4}".format(parts[1], ircutils.bold(parts[2]), ircutils.bold(parts[3]), parts[4], parts[5])
-                            elif parts[4] > parts[3]:  # awayTeam winning.
-                                match = "{0} - {1} {2}-{3} {4}".format(parts[1], parts[2], parts[3], ircutils.bold(parts[4]), ircutils.bold(parts[5]))
-                            else:  # tied
-                                match = "{0} - {1} {2}-{3} {4}".format(parts[1], parts[2], parts[3], parts[4], parts[5])
-                        # finish up by abbr/color
-                        match = match.replace('Final -', ircutils.mircColor('FT', 'red') + ' -')
-                        match = match.replace('Half -', ircutils.mircColor('HT', 'yellow') + ' -')
-                        match = match.replace('Postponed -', ircutils.mircColor('PP', 'yellow') + ' -')
-                    elif " vs " in match:  # match not started. String looks like: 11:45 AM - Stoke City vs Liverpool
-                        parts = match.split(' ', 3)  # try to split into 4, ['11:45', 'AM', 'PT', '- Stoke City vs Liverpool']
-                        if len(parts) is 4:  # see if the string split right.
-                            if parts[2] == "ET" or parts[2] == "CT" or parts[2] == "MT" or parts[2] == "PT":  # last sanity check.
-                                try:  # try and convert the timezone.
-                                    correctedtime = self._convertGMT(parts[2], parts[0], parts[1])
-                                    match = "{0} {1}".format(correctedtime, parts[3])
-                                except:
-                                    match = match
-                    # now we add the game in.
-                    append_list.append(str(match).strip())
-
-        if len(append_list) > 0:
-            for N in self._batch(append_list, 8):  # if more than 8.
-                if not self.registryValue('disableANSI', msg.args[0]):
-                    irc.reply("{0}".format(" | ".join([item for item in N])))
-                else:
-                    irc.reply("{0}".format(" | ".join([ircutils.stripFormatting(item) for item in N])))
-        else:
-            irc.reply("I did not find any matches going on for: %s" % leagueString)
-
-    soccer = wrap(soccer, [('somethingWithoutSpaces')])
+    soccer = wrap(soccer, [('text')])
 
     def soccerlineup(self, irc, msg, args, optteam):
         """<team>
@@ -201,13 +276,15 @@ class Soccer(callbacks.Plugin):
         """
 
         optteam = self._sanitizeName(optteam)  # sanitize input.
-
-        # fetch scoreboard here.
+        # build and fetch url. (scoreboard)
         url = self._b64decode('aHR0cDovL20uZXNwbi5nby5jb20vc29jY2VyL3Njb3JlYm9hcmQ/bGFuZz1FTiZ3amI9')
-        request = urllib2.Request(url)
-        response = (urllib2.urlopen(request))
+        html = self._httpget(url)
+        if not html:
+            irc.reply("ERROR: Failed to fetch {0}.".format(url))
+            self.log.error("ERROR opening {0}".format(url))
+            return
         # process html.
-        soup = BeautifulSoup(response.read())
+        soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
         games = soup.findAll('div', attrs={'style':'white-space: nowrap;'})
         # k,v where the key is the name of the team. value is match id.
         matches = {} #collections.defaultdict(list)
@@ -230,10 +307,13 @@ class Soccer(callbacks.Plugin):
         else:  # we did find a match. lets continue.
             # construct url with matchid.
             url = self._b64decode('aHR0cDovL20uZXNwbi5nby5jb20vc29jY2VyL2dhbWVjYXN0P2dhbWVJZD0=') + '%s&action=summary&lang=EN&wjb=' % optmatch
-            self.log.info(url)
-            request = urllib2.Request(url)
-            response = (urllib2.urlopen(request))
-            soup = BeautifulSoup(response.read())
+            html = self._httpget(url)
+            if not html:
+                irc.reply("ERROR: Failed to fetch {0}.".format(url))
+                self.log.error("ERROR opening {0}".format(url))
+                return
+            # process html.
+            soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
             link = soup.find('a', attrs={'class':'white'}, text='LINEUPS')
             if not link:  # test for link.
                 irc.reply("ERROR: I did not find a lineup for {0}. Either the match was suspended, check closer to gametime or no lineups given.".format(optteam))
@@ -259,9 +339,8 @@ class Soccer(callbacks.Plugin):
                             lineupsubs[lineupteams[y]].append(pn.encode('utf-8'))
                         else:  # non-subs.
                             lineup[lineupteams[y]].append(pn.encode('utf-8'))
-
             # output time.
-            for team in lineupteams:
+            for team in lineupteams:  # one per team.
                 irc.reply("{0} lineup :: {1} :: SUBS :: {2}".format(team, " | ".join(lineup[team]), " | ".join(lineupsubs[team])))
 
     soccerlineup = wrap(soccerlineup, [('text')])
@@ -272,34 +351,28 @@ class Soccer(callbacks.Plugin):
         Ex: EPL goals
         """
 
-        optleague = optleague.lower()
-        optstat = optstat.lower()
-
-        validstat = {'goals':'scorers', 'assists':'assists', 'cards':'discipline', 'fairplay':'fairplay'}
-
+        # check for valid stats and leagues below.
+        optleague, optstat = optleague.lower(), optstat.lower()
+        # check for a valid league.
         leagueString = self._validleagues(league=optleague)
-
-        if leagueString == "0":  # check for valid league.
-            irc.reply("ERROR: Must specify league. Leagues is one of: %s" % (self._validleagues(league=None)))
+        if not leagueString:
+            irc.reply("ERROR: Must specify league. Leagues is one of: {0}".format(self._validleagues(league=None)))
             return
-
-        if optstat not in validstat:  # check for valid stat.
-            irc.reply("ERROR: Stat category must be one of: %s" % validstat.keys())
+        # check for a valid stat.
+        validstat = {'goals':'scorers', 'assists':'assists', 'cards':'discipline', 'fairplay':'fairplay'}
+        if optstat not in validstat:
+            irc.reply("ERROR: Stat category must be one of: {0}".format(validstat.keys()))
             return
-
+        # build and fetch url.
         url = self._b64decode('aHR0cDovL3NvY2Nlcm5ldC5lc3BuLmdvLmNvbS9zdGF0cw==') + '/%s/_/league/%s/' % (validstat[optstat], leagueString)
-        # fetch url.
-        try:
-            req = urllib2.Request(url)
-            html = (urllib2.urlopen(req)).read()
-        except:
-            irc.reply("Failed to open %s" % url)
+        html = self._httpget(url)
+        if not html:
+            irc.reply("ERROR: Failed to fetch {0}.".format(url))
+            self.log.error("ERROR opening {0}".format(url))
             return
-
-        html = html.replace('&nbsp;','')
         # sanity check before.
         if "There are no statistics available for this season." in html:
-            irc.reply("I did not find any statistics for: %s in %s" % (optstat, optleague))
+            irc.reply("ERROR: I did not find any statistics for: {0} in {1}".format(optstat, optleague))
             return
         # process html.
         soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
@@ -319,7 +392,7 @@ class Soccer(callbacks.Plugin):
                 colname = colname.replace('Team','T').replace('Player','Plr').replace('Yellow','Y').replace('Red','R').replace('Points','Pts').replace('Assists','A').replace('Goals','G')
                 colstat = td
                 mini_list.append(ircutils.bold(colname) + ": " + colstat.getText())
-            append_list.append(" ".join(mini_list))
+            append_list.append(" ".join(mini_list))  # append stats.
         # output time.
         descstring = " | ".join([item for item in append_list])
         output = "Leaders in {0} for {1} :: {2}".format(ircutils.mircColor(optstat, 'red'), ircutils.underline(optleague), descstring.encode('utf-8'))
@@ -336,31 +409,29 @@ class Soccer(callbacks.Plugin):
         Ex: bundesliga
         """
 
+        # make sure we have a league.
         optleague = optleague.lower()
         leagueString = self._validleagues(league=optleague)
-
-        if leagueString == "0":
+        if not leagueString:
             irc.reply("ERROR: Must specify league. Leagues is one of: %s" % (self._validleagues(league=None)))
             return
-
+        # build and fetch url.
         url = self._b64decode('aHR0cDovL3NvY2Nlcm5ldC5lc3BuLmdvLmNvbS90YWJsZXMvXy9sZWFndWU=') + '/%s/' % leagueString
-        # fetch url
-        try:
-            req = urllib2.Request(url)
-            html = (urllib2.urlopen(req)).read()
-        except:
-            irc.reply("ERROR: Failed to open: %s" % url)
+        html = self._httpget(url)
+        if not html:
+            irc.reply("ERROR: Failed to fetch {0}.".format(url))
+            self.log.error("ERROR opening {0}".format(url))
             return
         # now process html.
         soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
         tables = soup.findAll('table', attrs={'class':'tablehead'})
-        for table in tables:  # must do this because of MLS
+        for table in tables:  # must do this because of MLS with east/west standings.
             # header = table.find('tr', attrs={'class':'colhead'}).findAll('td')
             title = table.find('thead').find('tr', attrs={'class':'stathead sl'})
             titleSpan = title.find('span')  # remove span which has the current date.
             if titleSpan:
                 titleSpan.extract()
-            rows = table.findAll('tr', attrs={'align':'right'})[1:]  # int option
+            rows = table.findAll('tr', attrs={'align':'right'})[1:]  # skip header.
             # list for output.
             append_list = []
             # each row is a team.
@@ -377,11 +448,9 @@ class Soccer(callbacks.Plugin):
                 else:  # draw/inactive.
                     appendString = (rank.getText() + ". " + team + " " + pts.getText())
                 append_list.append(appendString)
-
             # prepare to output.
-            #title = self._remove_accents(title.getText().strip().replace('\r\n', ''))
             title = title.getText().strip().encode('utf-8').replace('\r\n', '')
-            if not self.registryValue('disableANSI', msg.args[0]):
+            if not self.registryValue('disableANSI', msg.args[0]):  # display color or not?
                 descstring = " | ".join([item for item in append_list])
                 output = "{0} :: {1}".format(ircutils.bold(title), descstring)
             else:
