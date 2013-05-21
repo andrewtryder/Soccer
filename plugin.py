@@ -10,9 +10,10 @@
 import re
 from BeautifulSoup import BeautifulSoup
 import unicodedata
-from collections import defaultdict
+from collections import defaultdict  # container for soccerlineup
 import base64  # b64decode
-import pytz, datetime  # convertTZ
+import pytz  # convertTZ
+import datetime  # convertTZ
 
 # supybot libs.
 import supybot.utils as utils
@@ -351,8 +352,8 @@ class Soccer(callbacks.Plugin):
 
     def soccerstats(self, irc, msg, args, optleague, optstat):
         """<league> <goals|assists|cards|fairplay>
-        Display stats in league for stat.
-        Ex: EPL goals
+        Display stats in league for a statistic.
+        Ex: EPL goals or laliga assists or bundesliga cards
         """
 
         # check for valid stats and leagues below.
@@ -365,10 +366,10 @@ class Soccer(callbacks.Plugin):
         # check for a valid stat.
         validstat = {'goals':'scorers', 'assists':'assists', 'cards':'discipline', 'fairplay':'fairplay'}
         if optstat not in validstat:
-            irc.reply("ERROR: Stat category must be one of: {0}".format(validstat.keys()))
+            irc.reply("ERROR: Stat category must be one of: {0}".format(" | ".join(sorted(validstat.keys()))))
             return
         # build and fetch url.
-        url = self._b64decode('aHR0cDovL3NvY2Nlcm5ldC5lc3BuLmdvLmNvbS9zdGF0cw==') + '/%s/_/league/%s/' % (validstat[optstat], leagueString)
+        url = self._b64decode('aHR0cDovL3NvY2Nlcm5ldC5lc3BuLmdvLmNvbS9zdGF0cw==') + '/%s/_/league/%s/' % (validstat[optstat], leagueString[0])
         html = self._httpget(url)
         if not html:
             irc.reply("ERROR: Failed to fetch {0}.".format(url))
@@ -381,25 +382,26 @@ class Soccer(callbacks.Plugin):
         # process html.
         soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
         table = soup.find('table', attrs={'class':'tablehead'})
-        header = table.find('tr', attrs={'class':'colhead'}).findAll('td')
-        rows = table.findAll('tr', attrs={'class':re.compile('(^odd|^even)row')})[0:5]  # int option
-        del header[0]  # no need for rank. also delete below.
+        title = soup.find('h2').getText().encode('utf-8')
+        rows = table.findAll('tr', attrs={'class':re.compile('(^odd|^even)row')})[0:10]  # top10.
         # container for output.
         append_list = []
         # each row is a player.
         for row in rows:
             tds = row.findAll('td')
-            del tds[0]  # delete the first as it is the rank.
-            mini_list = []
-            for i,td in enumerate(tds):
-                colname = header[i].getText()
-                colname = colname.replace('Team','T').replace('Player','Plr').replace('Yellow','Y').replace('Red','R').replace('Points','Pts').replace('Assists','A').replace('Goals','G')
-                colstat = td
-                mini_list.append(ircutils.bold(colname) + ": " + colstat.getText())
-            append_list.append(" ".join(mini_list))  # append stats.
+            # depending on the stat, conditional adds to the list. utf-8 player/team names.
+            if optstat == "goals" or optstat == "assists":
+                appendString = "{0} ({1})".format(tds[1].getText().encode('utf-8'), tds[3].getText())
+            elif optstat == "cards":
+                appendString = "{0} (Y: {1} R: {2} PTS: {3})".format(tds[1].getText().encode('utf-8'), tds[3].getText(), tds[4].getText(), tds[5].getText())
+            elif optstat == "fairplay":
+                appendString = "{0} (Y: {1} R: {2} PTS: {3})".format(tds[1].getText().encode('utf-8'), tds[2].getText(), tds[3].getText(), tds[4].getText())
+            # finally add.
+            append_list.append(appendString)
         # output time.
-        descstring = " | ".join([item for item in append_list])
-        output = "Leaders in {0} for {1} :: {2}".format(ircutils.mircColor(optstat, 'red'), ircutils.underline(optleague), descstring.encode('utf-8'))
+        descstring = " | ".join([item for item in append_list])  # join all the players/stats.
+        #output = "{0} leaders in {1} :: {2}".format(ircutils.underline(optleague), ircutils.mircColor(optstat, 'red'), descstring)
+        output = "{0} :: {1}".format(ircutils.mircColor(title, 'red'), descstring)
         if not self.registryValue('disableANSI', msg.args[0]):  # display color or not?
             irc.reply(output)
         else:
@@ -420,7 +422,7 @@ class Soccer(callbacks.Plugin):
             irc.reply("ERROR: Must specify league. Leagues is one of: %s" % (self._validleagues(league=None)))
             return
         # build and fetch url.
-        url = self._b64decode('aHR0cDovL3NvY2Nlcm5ldC5lc3BuLmdvLmNvbS90YWJsZXMvXy9sZWFndWU=') + '/%s/' % leagueString
+        url = self._b64decode('aHR0cDovL3NvY2Nlcm5ldC5lc3BuLmdvLmNvbS90YWJsZXMvXy9sZWFndWU=') + '/%s/' % leagueString[0]
         html = self._httpget(url)
         if not html:
             irc.reply("ERROR: Failed to fetch {0}.".format(url))
