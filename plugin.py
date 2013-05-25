@@ -11,6 +11,7 @@ import re
 from BeautifulSoup import BeautifulSoup
 import unicodedata
 from collections import defaultdict  # container for soccerlineup
+from operator import itemgetter  # similar names.
 import base64  # b64decode
 import pytz  # convertTZ
 import datetime  # convertTZ
@@ -69,13 +70,27 @@ class Soccer(callbacks.Plugin):
             local = pytz.timezone("US/Mountain")
         elif origtz == "PT":
             local = pytz.timezone("US/Pacific")
-
         # going "from" here.
         naive = datetime.datetime.strptime(thetime + " " + ampm, "%I:%M %p")
         local_dt = local.localize(naive, is_dst=None)
         utc_dt = local_dt.astimezone(pytz.timezone(tzstring)) # convert from utc->local(tzstring).
         # return 24hr.
         return utc_dt.strftime("%H:%M")
+
+    def _similarTeams(self, teams, optteam):
+        """Returns the top5 closest team names in 'teams' based on edit distance to optteam."""
+
+        distances = []  # output container.
+        for k in teams:  # need to input a list of teams.
+            tmpdict = {}
+            tmpdict['dist'] = int(utils.str.distance(optteam, k))
+            tmpdict['name'] = k
+            distances.append(tmpdict)
+        # now find our top5 closest.
+        distances = sorted(distances, key=itemgetter('dist'), reverse=False)[0:5]
+        # return the team names as a list.
+        output = [i['name'] for i in distances]
+        return output
 
     def _sanitizeName(self, optname):
         """return a sanitized name so matching is easier."""
@@ -300,7 +315,8 @@ class Soccer(callbacks.Plugin):
         # now, fetch the matchid.
         optmatch = matches.get(optteam)
         if not optmatch:  # we did not find a matching team.
-            irc.reply("ERROR: I did not find any matches with '{0}' in them playing. Spelled wrong? Missing accent?".format(optteam))
+            irc.reply("ERROR: I did not find any matches with a team '{0}' in them playing. Spelled wrong? Missing accent?".format(optteam))
+            irc.reply("The closest five I found: {0}".format(" | ".join([i for i in self._similarTeams(matches, optteam)])))
             return
         else:  # we did find a match. lets continue.
             # construct url with matchid.
