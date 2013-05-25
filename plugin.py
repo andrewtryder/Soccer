@@ -57,7 +57,7 @@ class Soccer(callbacks.Plugin):
                 runningcount = len(item)
         yield(tmpslice)
 
-    def _convertTZ(self, origtz, thetime, ampm, optsport):
+    def _convertTZ(self, origtz, thetime, ampm, tzstring):
         """Crude function to take local AM/PM time and convert into GMT or others (24hr)."""
 
         # base zones.
@@ -70,16 +70,9 @@ class Soccer(callbacks.Plugin):
         elif origtz == "PT":
             local = pytz.timezone("US/Pacific")
 
-        # table for conversion depending on leagues.
-        tztable = {'mls':'US/Eastern', 'epl':'Europe/London'}
-
         # going "from" here.
         naive = datetime.datetime.strptime(thetime + " " + ampm, "%I:%M %p")
         local_dt = local.localize(naive, is_dst=None)
-        if optsport in tztable:  # use tztable above for string.
-            tzstring = tztable[optsport]  # conv based on league. table is above.
-        else:  # default to GMT.
-            tzstring = 'Europe/London'
         utc_dt = local_dt.astimezone(pytz.timezone(tzstring)) # convert from utc->local(tzstring).
         # return 24hr.
         return utc_dt.strftime("%H:%M")
