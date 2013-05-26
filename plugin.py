@@ -468,13 +468,64 @@ class Soccer(callbacks.Plugin):
             if not self.registryValue('disableANSI', msg.args[0]):  # display color or not?
                 descstring = " | ".join([item for item in append_list])
                 output = "{0} :: {1}".format(ircutils.bold(title), descstring)
-            else:
+            else:  # no color.
                 descstring = " | ".join([ircutils.stripFormatting(item) for item in append_list])
                 output = "{0} :: {1}".format(title, descstring)
             # output.
             irc.reply(output)
 
     soccertable = wrap(soccertable, [('somethingWithoutSpaces')])
+
+    def fifarankings(self, irc, msg, args, optinput):
+        """[team]
+        Display FIFA rankings.
+        Defaults to the top10 teams.
+        Call with [team] to find a team (country).
+        """
+
+        # build and fetch url.
+        url = self._b64decode('aHR0cDovL3VzLnNvY2NlcndheS5jb20vdGVhbXMvcmFua2luZ3MvZmlmYS8=')
+        html = self._httpget(url)
+        if not html:
+            irc.reply("ERROR: Failed to fetch {0}.".format(url))
+            self.log.error("ERROR opening {0}".format(url))
+            return
+        # now process html.
+        soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
+        year = soup.find('div', attrs={'id':'year-select'}).find('select').find('option', attrs={'selected':'selected'}).getText()
+        month = soup.find('div', attrs={'id':'month-select'}).find('select').find('option', attrs={'selected':'selected'}).getText()
+        table = soup.find('table', attrs={'class':'leaguetable table fifa_rankings'})
+        rows = table.findAll('tr', attrs={'class':re.compile('even|odd')})
+        # container for output. key = int(rank), value = team+entry.
+        fifarankings = defaultdict(list)
+        # each row is a team.
+        for row in rows:
+            tds = [item.getText() for item in row.findAll('td')]
+            rank = int(tds[0])
+            team = tds[1].encode('utf-8')
+            points = tds[2]
+            change = tds[4]
+            fifarankings[rank] = "{0} - {1}({2})".format(team, points, change)
+        # prepare for output.
+        if not optinput:  # just display top10.
+            output = " | ".join([str(k) + ". " + v for (k, v) in fifarankings.items()[0:10]])
+            if not self.registryValue('disableANSI', msg.args[0]):  # color
+                irc.reply("{0} ({1}-{2}) :: {3}".format(ircutils.mircColor("FIFA Rankings", 'red'), year, month, output))
+            else:  # no color
+                irc.reply("FIFA Rankings ({0}-{1}) :: {2}".format(year, month, output))
+        else:  # search for a specific team.
+            count = 0  # max 5 to display.
+            for (k, v) in fifarankings.items():  # iterate through all.
+                if optinput.lower() in v.lower():  # match here.
+                    count += 1  # ++ or +1.
+                    if count < 6:  # 5 or fewer, output.
+                        irc.reply("{0}. {1}".format(k, v))
+                    else:  # spit out a more specific.
+                        irc.reply("Sorry, I found too many matches for '{0}'. Please try to be more specific.".format(optinput))
+                        break
+
+    fifarankings = wrap(fifarankings, [optional('text')])
+
 
 Class = Soccer
 
