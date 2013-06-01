@@ -261,7 +261,10 @@ class Soccer(callbacks.Plugin):
             outlist = []  # container for output.
             for item in append_list:  # iterate through our matches.
                 if teamstring in item.lower():  # if we match item inside.
-                    outlist.append(item)  # add into our list.
+                    if not self.registryValue('disableANSI', msg.args[0]):  # color.
+                        outlist.append(item)  # add into our list.
+                    else:  # no color.
+                        outlist.append(ircutils.stripFormatting(item))
             # now that we have matching items, check length and output differently.
             if len(outlist) == 0:  # no matches found.
                 irc.reply("ERROR: I did not find anything for: '{0}'. To see valid leagues and tournaments, issue 'leagues' as argument.".format(teamstring))
