@@ -12,10 +12,10 @@ from BeautifulSoup import BeautifulSoup
 import unicodedata
 from collections import defaultdict  # container for soccerlineup
 from operator import itemgetter  # similar names.
+import random
 import base64  # b64decode
 import pytz  # convertTZ
 import datetime  # convertTZ
-
 # supybot libs.
 import supybot.utils as utils
 from supybot.commands import *
@@ -284,6 +284,43 @@ class Soccer(callbacks.Plugin):
                         irc.reply(" | ".join([ircutils.stripFormatting(append_list[item]) for item in splice]))
 
     soccer = wrap(soccer, [('text')])
+
+    def soccerformation(self, irc, msg, args):
+        """
+        Display a random lineup for channel users.
+        """
+
+        if not ircutils.isChannel(msg.args[0]):  # make sure its run in a channel.
+            irc.reply("ERROR: Must be run from a channel.")
+            return
+        # now make sure we have more than 9 users.
+        users = [i for i in irc.state.channels[msg.args[0]].users]
+        if len(users) < 11:  # need >9 users.
+            irc.reply("Sorry, I can only run this in a channel with more than 9 users.")
+            return
+        # now that we're good..
+        formations = {'4-4-2':['(GK)', '(RB)', '(CB)', '(CB)', '(LB)', '(RM)', '(LM)', '(CM)', '(CM)', '(FW)', '(FW)'],
+                      '4-4-1-1':['(GK)', '(RB)', '(CB)', '(CB)', '(LB)', '(RM)', '(LM)', '(CM)', '(CM)', '(ST)', '(FW)'],
+                      '4-5-1':['(GK)', '(RB)', '(CB)', '(CB)', '(LB)', '(RM)', '(LM)', '(CM)', '(CM)', '(CM)', '(ST)'],
+                      '3-5-1-1':['(GK)', '(CB)', '(CB)', '(SW)', '(RM)', '(CM)', '(LM)', '(CM)', '(CM)', '(FW)', '(ST)'],
+                      '10-1 (CHELSEA)':['(GK)', '(LB)', '(CB)', '(RB)', '(CB)', '(CB)', '(CB)', '(CB)', '(CB)', '(CB)', '(DROGBA)'],
+                      '8-1-1 (PARK THE BUS)':['(GK)', '(LB)', '(CB)', '(RB)', '(CB)', '(CB)', '(CB)', '(CB)', '(CB)', '(CM)', '(ST)']
+                     }
+        formation = random.choice(formations.keys())
+        random.shuffle(formations[formation])  # shuffle.
+        lineup = []  # list for output.
+        for position in formations[formation]:  # iterate through and highlight.
+            a = random.choice(users)  # pick a random user.
+            users.remove(a)  # remove so its unique. append below.
+            lineup.append("{0}{1}".format(ircutils.bold(a), position))
+        # now output.
+        output = "{0} ALL-STAR LINEUP ({1}) :: {2}".format(ircutils.mircColor(msg.args[0], 'red'), formation, ", ".join(lineup))
+        if not self.registryValue('disableANSI', msg.args[0]):  # display color or not?
+            irc.reply(output)
+        else:
+            irc.reply(ircutils.stripFormatting(output))
+
+    soccerformation = wrap(soccerformation)
 
     def soccerlineup(self, irc, msg, args, optteam):
         """<team>
