@@ -13,9 +13,11 @@ import unicodedata
 from collections import defaultdict  # container for soccerlineup
 from operator import itemgetter  # similar names.
 import random
-import base64  # b64decode
+from base64 import b64decode  # b64decode
 import pytz  # convertTZ
 import datetime  # convertTZ
+import sqlite3
+import os.path
 # supybot libs.
 import supybot.utils as utils
 from supybot.commands import *
@@ -32,10 +34,94 @@ class Soccer(callbacks.Plugin):
     This should describe *how* to use this plugin."""
     threaded = True
 
-    def _b64decode(self, string):
-        """Returns base64 decoded string."""
+    def __init__(self, irc):
+        self.__parent = super(Soccer, self)
+        self.__parent.__init__(irc)
+        self._soccerdb = os.path.abspath(os.path.dirname(__file__)) + '/db/soccer.db'
 
-        return base64.b64decode(string)
+    def die(self):
+        self.__parent.die()
+
+    ######################
+    # DATABASE FUNCTIONS #
+    ######################
+
+    def _confdb(self, optconf=None):
+        """Validate a conf or return a list of them."""
+
+        with sqlite3.connect(self._soccerdb) as conn:
+            cursor = conn.cursor()
+            if optconf:
+                query = "SELECT country FROM countries WHERE country=?"
+                cursor.execute(query, (optconf,))
+                row = cursor.fetchone()
+                if row:  # found the country.
+                    return row[0]
+                else:  # did not find the country.
+                    return None
+            else:  # want a list of countries.
+                query = "SELECT country FROM countries"
+                cursor.execute(query)
+                countrylist = sorted([item[0].encode('utf-8') for item in cursor.fetchall()])
+                return countrylist
+
+    def _allteams(self, optconf=None):
+        """Return a list of all valid teams. Or, returns all teams in a conf."""
+
+        with sqlite3.connect(self._soccerdb) as conn:
+            cursor = conn.cursor()
+            if optconf:  # if we have a conf.
+                query = "SELECT name FROM teams WHERE country=?"
+                cursor.execute(query, (optconf,))
+            else:  # no conf.
+                query = "SELECT name FROM teams"
+                cursor.execute(query)
+            teamlist = sorted([item[0].encode('utf-8') for item in cursor.fetchall()])
+        # return.
+        return teamlist
+
+    def _findteam(self, optteam):
+        """Search and return first matching team."""
+
+        optteam = "%"+(optteam.lower().replace(' ', '%'))+"%"  # lower, % for spaces+before+after.
+
+        with sqlite3.connect(self._soccerdb) as conn:
+            cursor = conn.cursor()
+            query = "SELECT teamid FROM teams where name LIKE ?"
+            cursor.execute(query, (optteam,))
+            row = cursor.fetchone()
+            self.log.info(str(row))
+            if row:  # matching team.
+                return row[0]
+            else:  # no matches.
+                return None
+
+    def allteams(self, irc, msg, args, optteam):
+        """
+        .
+        """
+
+        testconf = self._confdb(optconf=optteam)
+        self.log.info(str(testconf))
+        if not testconf:  # didn't find the conf.
+            conflist = self._confdb(optconf=None)
+            irc.reply(conflist)
+            return
+        else:
+            allt = self._allteams(optconf=testconf)
+            irc.reply(" | ".join([item for item in allt]))
+            return
+
+    allteams = wrap(allteams, [optional('text')])
+
+    ######################
+    # INTERNAL FUNCTIONS #
+    ######################
+
+    def _b64decode(self, string):
+        """Decode a base64 encoded string."""
+
+        return b64decode(string)
 
     def _remove_accents(self, data):
         """Clean up accented team names so we can print."""
@@ -96,7 +182,7 @@ class Soccer(callbacks.Plugin):
         """return a sanitized name so matching is easier."""
 
         optname = optname.lower()  # lower because case sucks.
-        optname = optname.replace('.', '')  # remove periods.
+        optname = optname.strip('.')  # remove periods.
         optname = optname.strip()  # remove spaces on the outside
         return optname
 
@@ -127,6 +213,9 @@ class Soccer(callbacks.Plugin):
                         'intlfriendly':['fifa.friendly', 'US/Eastern'],
                         'wcq-concacaf':['fifa.worldq.concacaf', 'US/Eastern'],
                         'wcq-conmebol':['fifa.worldq.conmebol', 'US/Eastern'],
+                        'wcq-caf':['FIFA.WORLDQ.CAF', 'US/Eastern'],
+                        'confederations':['FIFA.CONFEDERATIONS', 'US/Eastern'],
+                        'uefa-u21':['UEFA.EURO_U21', 'CET'],
                         'ucl':['UEFA.CHAMPIONS', 'CET'],
                         'carling':['ENG.WORTHINGTON', 'GMT'],
                         'europa':['UEFA.EUROPA', 'CET'],
