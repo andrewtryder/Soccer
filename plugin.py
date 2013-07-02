@@ -9,13 +9,14 @@
 # my libs.
 import re
 from BeautifulSoup import BeautifulSoup
-import unicodedata
+from base64 import b64decode  # b64decode
 from collections import defaultdict  # container for soccerlineup
 from operator import itemgetter  # similar names.
+import unicodedata
 import random
-from base64 import b64decode  # b64decode
 import pytz  # convertTZ
 import datetime  # convertTZ
+import jellyfish
 import sqlite3
 import os.path
 # supybot libs.
@@ -46,73 +47,30 @@ class Soccer(callbacks.Plugin):
     # DATABASE FUNCTIONS #
     ######################
 
-    def _confdb(self, optconf=None):
-        """Validate a conf or return a list of them."""
-
-        with sqlite3.connect(self._soccerdb) as conn:
-            cursor = conn.cursor()
-            if optconf:
-                query = "SELECT country FROM countries WHERE country=?"
-                cursor.execute(query, (optconf,))
-                row = cursor.fetchone()
-                if row:  # found the country.
-                    return row[0]
-                else:  # did not find the country.
-                    return None
-            else:  # want a list of countries.
-                query = "SELECT country FROM countries"
-                cursor.execute(query)
-                countrylist = sorted([item[0].encode('utf-8') for item in cursor.fetchall()])
-                return countrylist
-
-    def _allteams(self, optconf=None):
-        """Return a list of all valid teams. Or, returns all teams in a conf."""
-
-        with sqlite3.connect(self._soccerdb) as conn:
-            cursor = conn.cursor()
-            if optconf:  # if we have a conf.
-                query = "SELECT name FROM teams WHERE country=?"
-                cursor.execute(query, (optconf,))
-            else:  # no conf.
-                query = "SELECT name FROM teams"
-                cursor.execute(query)
-            teamlist = sorted([item[0].encode('utf-8') for item in cursor.fetchall()])
-        # return.
-        return teamlist
-
     def _findteam(self, optteam):
         """Search and return first matching team."""
 
-        optteam = "%"+(optteam.lower().replace(' ', '%'))+"%"  # lower, % for spaces+before+after.
-
+        optteam = self._sanitizeName(optteam)
+        # lower, % for spaces+before+after.
+        optteam = "%"+(optteam.replace(' ', '%'))+"%"
+        # now do our db work.
         with sqlite3.connect(self._soccerdb) as conn:
             cursor = conn.cursor()
             query = "SELECT teamid FROM teams where name LIKE ?"
             cursor.execute(query, (optteam,))
             row = cursor.fetchone()
-            self.log.info(str(row))
             if row:  # matching team.
                 return row[0]
-            else:  # no matches.
-                return None
-
-    def allteams(self, irc, msg, args, optteam):
-        """
-        .
-        """
-
-        testconf = self._confdb(optconf=optteam)
-        self.log.info(str(testconf))
-        if not testconf:  # didn't find the conf.
-            conflist = self._confdb(optconf=None)
-            irc.reply(conflist)
-            return
-        else:
-            allt = self._allteams(optconf=testconf)
-            irc.reply(" | ".join([item for item in allt]))
-            return
-
-    allteams = wrap(allteams, [optional('text')])
+            else:  # no matches. do some fuzzy stuff.
+                similar = []  # list to put our matches in.
+                query = "SELECT name FROM teams"  # grab all teams.
+                cursor.execute(query)
+                rows = cursor.fetchall()  # fetch all teams.
+                for row in rows:  # row[0] = teamid, row[1] = name
+                    similar.append({'jaro':jellyfish.jaro_distance(optteam, row[0].encode('utf-8')), 'name':row[0]})
+                # now grab the top5 matching based on jaro distance.
+                matching = sorted(similar, key=itemgetter('jaro'), reverse=True)[0:5] # bot five.
+                return matching
 
     ######################
     # INTERNAL FUNCTIONS #
@@ -216,6 +174,7 @@ class Soccer(callbacks.Plugin):
                         'wcq-caf':['FIFA.WORLDQ.CAF', 'US/Eastern'],
                         'confederations':['FIFA.CONFEDERATIONS', 'US/Eastern'],
                         'uefa-u21':['UEFA.EURO_U21', 'CET'],
+                        'fifa-u20':['FIFA.WORLD.U20', 'CET'],
                         'ucl':['UEFA.CHAMPIONS', 'CET'],
                         'carling':['ENG.WORTHINGTON', 'GMT'],
                         'europa':['UEFA.EUROPA', 'CET'],
@@ -373,6 +332,56 @@ class Soccer(callbacks.Plugin):
                         irc.reply(" | ".join([ircutils.stripFormatting(append_list[item]) for item in splice]))
 
     soccer = wrap(soccer, [('text')])
+
+    def soccerfixtures(self, irc, msg, args, optteam):
+        """<team>
+
+        Display fixtures/results for team.
+        Ex: Manchester United
+        """
+
+        # first, sanitize input name for lookup.
+        optteam = self._sanitizeName(optteam)
+        # see if we can find the team. either returns their id or a list of 5 similar ones.
+        findteam = self._findteam(optteam)
+        if isinstance(findteam, list):  # if match no good, list returned. give simmilar teams.
+            st = " | ".join([i['name'] for i in findteam])  # join for output. display below.
+            irc.reply("ERROR: '{0}' did not match any teams in the database. Did you mean: {1}".format(optteam, st))
+            return
+        # build and fetch url.
+        url = self._b64decode('aHR0cDovL2VzcG5mYy5jb20vdGVhbS9maXh0dXJlcw==') + '?id=%s&cc=5901' % (findteam)
+        html = self._httpget(url)
+        if not html:
+            irc.reply("ERROR: Failed to fetch {0}.".format(url))
+            self.log.error("ERROR opening {0}".format(url))
+            return
+        # process html.
+        soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
+        title = soup.find('div', attrs={'id':'subheader'}).find('h2').getText().encode('utf-8')
+        div = soup.find('div', attrs={'id':'my-teams-table'})
+        table = div.find('table', attrs={'class':'tablehead'})
+        rows = table.findAll('tr', attrs={'class':re.compile('^(even|odd)row')})
+        # list for output.
+        fixtures = []
+        #
+        for row in rows:
+            tds = row.findAll('td')
+            date = tds[0].getText()
+            #dtime = tds[1].getText().replace(' ET', '')
+            homet = tds[2].getText().encode('utf-8')
+            awayt = tds[4].getText().encode('utf-8')
+            #venue = tds[5].getText().encode('utf-8')
+            #comp = tds[6].getText().encode('utf-8')
+            # create dict.
+            tmp = {'date':date, 'homet':homet, 'awayt':awayt}
+            # append dict.
+            fixtures.append(tmp)
+        # prep output.
+        games = " | ".join([i['date'] + " - " + i['homet'] + " v. " + i['awayt'] for i in fixtures])
+        output = "{0} :: {1}".format(title, games)
+        irc.reply(output)
+
+    soccerfixtures = wrap(soccerfixtures, [('text')])
 
     def soccerformation(self, irc, msg, args):
         """
