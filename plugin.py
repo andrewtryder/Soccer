@@ -201,7 +201,7 @@ class Soccer(callbacks.Plugin):
         leagues = { 'mls':['usa.1', 'US/Eastern'],
                     'epl':['eng.1', 'GMT'],
                     'laliga':['esp.1', 'CET'],
-                    'skybet':['eng.2', 'GMT'],
+                    'skybet-cship':['eng.2', 'GMT'],
                     'seriea':['ita.1', 'CET'],
                     'bundesliga':['ger.1', 'CET'],
                     'ligue1':['fra.1', 'CET'],
