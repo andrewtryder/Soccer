@@ -201,7 +201,7 @@ class Soccer(callbacks.Plugin):
         leagues = { 'mls':['usa.1', 'US/Eastern'],
                     'epl':['eng.1', 'GMT'],
                     'laliga':['esp.1', 'CET'],
-                    'npower-cship':['eng.2', 'GMT'],
+                    'skybet':['eng.2', 'GMT'],
                     'seriea':['ita.1', 'CET'],
                     'bundesliga':['ger.1', 'CET'],
                     'ligue1':['fra.1', 'CET'],
@@ -254,16 +254,18 @@ class Soccer(callbacks.Plugin):
                     teamstring = optscore  # must be looking for a team.
         # now, based on above, we setup our url and tzstring.
         if leaguestring:  # if we're looking for a league.
-            url = self._b64decode('aHR0cDovL20uZXNwbi5nby5jb20vc29jY2VyL3Njb3JlYm9hcmQ/') + 'leagueTag=%s&lang=EN&wjb=' % leaguestring[0]
+            url = self._b64decode('aHR0cDovL20uZXNwbi5nby5jb20vc29jY2VyL3NlY3Rpb24/') + 'id=%s&lang=EN&wjb=' % leaguestring[0]
             tzstring = leaguestring[1]
         elif not leaguestring and tournamentstring:  # no league string.
-            url = self._b64decode('aHR0cDovL20uZXNwbi5nby5jb20vc29jY2VyL3Njb3JlYm9hcmQ/') + 'leagueTag=%s&lang=EN&wjb=' % tournamentstring[0]
+            url = self._b64decode('aHR0cDovL20uZXNwbi5nby5jb20vc29jY2VyL3NlY3Rpb24/') + 'id=%s&lang=EN&wjb=' % tournamentstring[0]
             tzstring = tournamentstring[1]
         else:  # generic url (search with teamstring)
             url = self._b64decode('aHR0cDovL20uZXNwbi5nby5jb20vc29jY2VyL3Njb3JlYm9hcmQ/Jmxhbmc9RU4md2piPQ==')
             tzstring = 'US/Eastern'
         # fetch url.
-        html = self._httpget(url)
+        self.log.info(url)
+        headers = {"User-Agent":"Mozilla/5.0 (X11; Ubuntu; Linux i686; rv:17.0) Gecko/20100101 Firefox/17.0"}
+        html = self._httpget(url, h=headers)
         if not html:
             irc.reply("ERROR: Failed to fetch {0}.".format(url))
             self.log.error("ERROR opening {0}".format(url))
@@ -275,8 +277,8 @@ class Soccer(callbacks.Plugin):
         append_list = []
         # each div is a container for games.
         for div in divs:
-            if div.find('div', attrs={'style':'white-space: nowrap;'}):  # each of these are games.
-                match = div.find('div', attrs={'style':'white-space: nowrap;'})
+            match = div.find('a', attrs={'href':re.compile('^gamecast.*')})
+            if match:
                 match = match.getText().encode('utf-8')  # do string formatting/color. encode.
                 match = match.split('(', 1)[0]  # easier to strip out the tv stuff.
                 # now, we're left with the text. two conditionals for game started or not.
