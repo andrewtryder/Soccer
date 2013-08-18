@@ -144,17 +144,15 @@ class Soccer(callbacks.Plugin):
         optname = optname.strip()  # remove spaces on the outside
         return optname
 
-    def _httpget(self, url, h=None, d=None, l=True):
-        """General HTTP resource fetcher. Pass headers via h, data via d, and to log via l."""
+    def _httpget(self, url):
+        """General HTTP resource fetcher. Pass log via l."""
 
-        if self.registryValue('logURLs') and l:
+        if self.registryValue('logURLs'):
             self.log.info(url)
 
         try:
-            if h and d:
-                page = utils.web.getUrl(url, headers=h, data=d)
-            else:
-                page = utils.web.getUrl(url)
+            headers = {"User-Agent":"Mozilla/5.0 (X11; Ubuntu; Linux i686; rv:17.0) Gecko/20100101 Firefox/17.0"}
+            page = utils.web.getUrl(url, headers=headers)
             return page
         except utils.web.Error as e:
             self.log.error("ERROR opening {0} message: {1}".format(url, e))
@@ -263,9 +261,7 @@ class Soccer(callbacks.Plugin):
             url = self._b64decode('aHR0cDovL20uZXNwbi5nby5jb20vc29jY2VyL3Njb3JlYm9hcmQ/Jmxhbmc9RU4md2piPQ==')
             tzstring = 'US/Eastern'
         # fetch url.
-        self.log.info(url)
-        headers = {"User-Agent":"Mozilla/5.0 (X11; Ubuntu; Linux i686; rv:17.0) Gecko/20100101 Firefox/17.0"}
-        html = self._httpget(url, h=headers)
+        html = self._httpget(url)
         if not html:
             irc.reply("ERROR: Failed to fetch {0}.".format(url))
             self.log.error("ERROR opening {0}".format(url))
@@ -430,7 +426,7 @@ class Soccer(callbacks.Plugin):
 
         optteam = self._sanitizeName(optteam)  # sanitize input.
         # build and fetch url. (scoreboard)
-        url = self._b64decode('aHR0cDovL20uZXNwbi5nby5jb20vc29jY2VyL3Njb3JlYm9hcmQ/bGFuZz1FTiZ3amI9')
+        url = self._b64decode('aHR0cDovL20uZXNwbi5nby5jb20vc29jY2VyL3Njb3JlYm9hcmQ/JndqYj0=')
         html = self._httpget(url)
         if not html:
             irc.reply("ERROR: Failed to fetch {0}.".format(url))
@@ -444,6 +440,7 @@ class Soccer(callbacks.Plugin):
         # for each match, filter.
         for game in games:
             if game.find('a', attrs={'href':re.compile('^gamecast.*')}):  # only matches.
+                self.log.info("MATCH: {0}".format(game.getText().encode('utf-8')))
                 match = game.getText()  # text so we can regex below.
                 match = match.replace('(ESPN, UK)','').replace('(ESPN3)','').replace('(ESPN2)','').replace('(ESPN, US)','')  # remove manually
                 parts = re.split("^.*?\s-\s(.*?)\s(?:vs|\d+-\d+|P-P)\s(.*?)$", match, re.UNICODE)
