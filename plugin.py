@@ -252,15 +252,16 @@ class Soccer(callbacks.Plugin):
                     teamstring = optscore  # must be looking for a team.
         # now, based on above, we setup our url and tzstring.
         if leaguestring:  # if we're looking for a league.
-            url = self._b64decode('aHR0cDovL20uZXNwbi5nby5jb20vc29jY2VyL3NlY3Rpb24/') + 'id=%s&lang=EN&wjb=' % leaguestring[0]
+            url = self._b64decode('aHR0cDovL20uZXNwbi5nby5jb20vc29jY2VyL3Njb3JlYm9hcmQ/') + 'leagueTag=%s&lang=EN&wjb=' % leaguestring[0]
             tzstring = leaguestring[1]
         elif not leaguestring and tournamentstring:  # no league string.
-            url = self._b64decode('aHR0cDovL20uZXNwbi5nby5jb20vc29jY2VyL3NlY3Rpb24/') + 'id=%s&lang=EN&wjb=' % tournamentstring[0]
+            url = self._b64decode('aHR0cDovL20uZXNwbi5nby5jb20vc29jY2VyL3Njb3JlYm9hcmQ/') + 'leagueTag=%s&lang=EN&wjb=' % tournamentstring[0]
             tzstring = tournamentstring[1]
         else:  # generic url (search with teamstring)
             url = self._b64decode('aHR0cDovL20uZXNwbi5nby5jb20vc29jY2VyL3Njb3JlYm9hcmQ/Jmxhbmc9RU4md2piPQ==')
             tzstring = 'US/Eastern'
         # fetch url.
+        # self.log.info(url)
         html = self._httpget(url)
         if not html:
             irc.reply("ERROR: Failed to fetch {0}.".format(url))
