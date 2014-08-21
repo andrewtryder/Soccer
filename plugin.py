@@ -442,7 +442,7 @@ class Soccer(callbacks.Plugin):
         # for each match, filter.
         for game in games:
             if game.find('a', attrs={'href':re.compile('^gamecast.*')}):  # only matches.
-                self.log.info("MATCH: {0}".format(game.getText().encode('utf-8')))
+                #self.log.info("MATCH: {0}".format(game.getText().encode('utf-8')))
                 match = game.getText()  # text so we can regex below.
                 match = match.replace('(ESPN, UK)','').replace('(ESPN3)','').replace('(ESPN2)','').replace('(ESPN, US)','')  # remove manually
                 parts = re.split("^.*?\s-\s(.*?)\s(?:vs|\d+-\d+|P-P)\s(.*?)$", match, re.UNICODE)
@@ -497,65 +497,6 @@ class Soccer(callbacks.Plugin):
                 irc.reply("{0} lineup :: {1} :: SUBS :: {2}".format(team, " | ".join(lineup[team]), " | ".join(lineupsubs[team])))
 
     soccerlineup = wrap(soccerlineup, [('text')])
-
-    def soccerstats(self, irc, msg, args, optleague, optstat):
-        """<league> <goals|assists|cards|fairplay>
-        Display stats in league for a statistic.
-        Ex: EPL goals or laliga assists or bundesliga cards
-        """
-
-        # check for valid stats and leagues below.
-        optleague, optstat = optleague.lower(), optstat.lower()
-        # check for a valid league.
-        leagueString = self._validleagues(league=optleague)
-        if not leagueString:
-            irc.reply("ERROR: Must specify league. Leagues is one of: {0}".format(self._validleagues(league=None)))
-            return
-        # check for a valid stat.
-        validstat = {'goals':'scorers', 'assists':'assists', 'cards':'discipline', 'fairplay':'fairplay'}
-        if optstat not in validstat:
-            irc.reply("ERROR: Stat category must be one of: {0}".format(" | ".join(sorted(validstat.keys()))))
-            return
-        # build and fetch url.
-        url = self._b64decode('aHR0cDovL3NvY2Nlcm5ldC5lc3BuLmdvLmNvbS9zdGF0cw==') + '/%s/_/league/%s/' % (validstat[optstat], leagueString[0])
-        html = self._httpget(url)
-        if not html:
-            irc.reply("ERROR: Failed to fetch {0}.".format(url))
-            self.log.error("ERROR opening {0}".format(url))
-            return
-        # sanity check before.
-        if "There are no statistics available for this season." in html:
-            irc.reply("ERROR: I did not find any statistics for: {0} in {1}".format(optstat, optleague))
-            return
-        # process html.
-        soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
-        table = soup.find('table', attrs={'class':'tablehead'})
-        title = soup.find('h2').getText().encode('utf-8')
-        rows = table.findAll('tr', attrs={'class':re.compile('(^odd|^even)row')})[0:10]  # top10.
-        # container for output.
-        append_list = []
-        # each row is a player.
-        for row in rows:
-            tds = row.findAll('td')
-            # depending on the stat, conditional adds to the list. utf-8 player/team names.
-            if optstat == "goals" or optstat == "assists":
-                appendString = "{0} ({1})".format(tds[1].getText().encode('utf-8'), tds[3].getText())
-            elif optstat == "cards":
-                appendString = "{0} (Y: {1} R: {2} PTS: {3})".format(tds[1].getText().encode('utf-8'), tds[3].getText(), tds[4].getText(), tds[5].getText())
-            elif optstat == "fairplay":
-                appendString = "{0} (Y: {1} R: {2} PTS: {3})".format(tds[1].getText().encode('utf-8'), tds[2].getText(), tds[3].getText(), tds[4].getText())
-            # finally add.
-            append_list.append(appendString)
-        # output time.
-        descstring = " | ".join([item for item in append_list])  # join all the players/stats.
-        #output = "{0} leaders in {1} :: {2}".format(ircutils.underline(optleague), ircutils.mircColor(optstat, 'red'), descstring)
-        output = "{0} :: {1}".format(ircutils.mircColor(title, 'red'), descstring)
-        if not self.registryValue('disableANSI', msg.args[0]):  # display color or not?
-            irc.reply(output)
-        else:
-            irc.reply(ircutils.stripFormatting(output))
-
-    soccerstats = wrap(soccerstats, [('somethingWithoutSpaces'), ('somethingWithoutSpaces')])
 
     def soccertable(self, irc, msg, args, optleague):
         """<league>
