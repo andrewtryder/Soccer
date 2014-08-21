@@ -519,40 +519,20 @@ class Soccer(callbacks.Plugin):
             return
         # now process html.
         soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
-        tables = soup.findAll('table', attrs={'class':'tablehead'})
+        tables = soup.findAll('div', attrs={'class':'responsive-table-content'})
         for table in tables:  # must do this because of MLS with east/west standings.
-            # header = table.find('tr', attrs={'class':'colhead'}).findAll('td')
-            title = table.find('thead').find('tr', attrs={'class':'stathead sl'})
-            titleSpan = title.find('span')  # remove span which has the current date.
-            if titleSpan:
-                titleSpan.extract()
-            rows = table.findAll('tr', attrs={'align':'right'})[1:]  # skip header.
-            # list for output.
-            append_list = []
-            # each row is a team.
-            for row in rows:
-                tds = row.findAll('td')
-                rank = tds[0]
-                movement = tds[1].find('img')['src']
-                team = self._remove_accents(tds[2].getText()) #.encode('utf-8')
-                pts = tds[-1]
-                if "up_arrow" in movement:  # moving up.
-                    appendString = (rank.getText() + ". " + team + " " + pts.getText())
-                elif "down_arrow" in movement:  # lost points.
-                    appendString = (rank.getText() + ". " + team + " " + pts.getText())
-                else:  # draw/inactive.
-                    appendString = (rank.getText() + ". " + team + " " + pts.getText())
-                append_list.append(appendString)
-            # prepare to output.
-            title = title.getText().strip().encode('utf-8').replace('\r\n', '')
-            if not self.registryValue('disableANSI', msg.args[0]):  # display color or not?
-                descstring = " | ".join([item for item in append_list])
-                output = "{0} :: {1}".format(ircutils.bold(title), descstring)
-            else:  # no color.
-                descstring = " | ".join([ircutils.stripFormatting(item) for item in append_list])
-                output = "{0} :: {1}".format(title, descstring)
-            # output.
-            irc.reply(output)
+            h = table.find('th', attrs={'class':'pos'})
+            tbody = table.find('tbody')
+            o = []  # output
+            teams = tbody.findAll('tr')[1:]  # first = header.
+            for t in teams:
+                tds = t.findAll('td')
+                pos = tds[0].getText().encode('utf-8')
+                team = tds[1].getText().encode('utf-8')
+                pts = tds[3].getText().encode('utf-8')
+                o.append("{0}. {1} ({2})".format(pos, team, pts))
+            # now output.
+            irc.reply("{0} :: {1}".format(h.getText().encode('utf-8'), " | ".join(o)))
 
     soccertable = wrap(soccertable, [('somethingWithoutSpaces')])
 
