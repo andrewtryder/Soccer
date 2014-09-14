@@ -522,6 +522,10 @@ class Soccer(callbacks.Plugin):
         tables = soup.findAll('div', attrs={'class':'responsive-table-content'})
         for table in tables:  # must do this because of MLS with east/west standings.
             h = table.find('th', attrs={'class':'pos'})
+            h = h.getText().encode('utf-8')
+            # test length.
+            if len(h) == 0:  # no length. use input.
+                h = optleague
             tbody = table.find('tbody')
             o = []  # output
             teams = tbody.findAll('tr')[1:]  # first = header.
@@ -529,10 +533,10 @@ class Soccer(callbacks.Plugin):
                 tds = t.findAll('td')
                 pos = tds[0].getText().encode('utf-8')
                 team = tds[1].getText().encode('utf-8')
-                pts = tds[3].getText().encode('utf-8')
+                pts = tds[-1].getText().encode('utf-8')
                 o.append("{0}. {1} ({2})".format(pos, team, pts))
             # now output.
-            irc.reply("{0} :: {1}".format(h.getText().encode('utf-8'), " | ".join(o)))
+            irc.reply("{0} :: {1}".format(h, " | ".join(o)))
 
     soccertable = wrap(soccertable, [('somethingWithoutSpaces')])
 
