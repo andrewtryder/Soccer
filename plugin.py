@@ -420,6 +420,59 @@ class Soccer(callbacks.Plugin):
 
     soccerformation = wrap(soccerformation)
 
+    def soccerstats(self, irc, msg, args, optlg, optstat):
+        """<league> <goals|assists>
+        
+        Display leaders in a league for goals or assists.
+        Ex: epl goals OR laliga assists
+        """
+    
+        # lets lower both.
+        optlg, optstat = optlg.lower(), optstat.lower()
+
+        # league tables
+        t = { 'epl':['barclays-premier-league', '23'],
+              'laliga':['spanish-primera-división', '15'],
+              'ligue1':['french-ligue-1', '9'],
+              'bundesliga':['german-bundesliga', '10'],
+              'seriea':['italian-serie-a', '12'],
+              'mls':['major-league-soccer', '19']
+            }
+        # stats.
+        s = {'goals':'scorers', 'assists':'assists'}
+        # check leagues
+        if optlg not in t:
+            irc.reply("ERROR: League must be one of: {0}".format(" | ".join([i for i in t.keys()])))
+            return
+        # check stat.
+        if optstat not in s:
+            irc.reply("ERROR: stat type must be one of: {0}".format(" | ".join([i for i in s.keys()])))
+            return
+        # now we're good. lets go.
+        url = self._b64decode('aHR0cDovL3d3dy5lc3BuZmMudXM=') + '/%s/%s/statistics/%s' % (t[optlg][0], t[optlg][1], s[optstat])
+        html = self._httpget(url)
+        if not html:
+            irc.reply("ERROR: Failed to fetch {0}.".format(url))
+            self.log.error("ERROR opening {0}".format(url))
+            return
+        # process html.
+        soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
+        table = soup.find('table', attrs={'class':'data'})
+        if not table:
+            irc.reply("Table not found on: {0}".format(url))
+            return
+        tbody = table.find('tbody')
+        rows = tbody.findAll('tr')[0:5]  # top5.
+        o = []
+        for row in rows:
+            r = [i.getText().encode('utf-8') for i in row.findAll('td')]
+            # append the name, team, #
+            o.append("{0} ({1}) {2}".format(r[1], r[2], r[3]))
+        # now output.
+        irc.reply("Top 5 {0} in {1} :: {2}".format(s[optstat], optlg, " | ".join([z for z in o])))
+    
+    soccerstats = wrap(soccerstats, [('somethingWithoutSpaces'), ('somethingWithoutSpaces')])
+    
     def soccerlineup(self, irc, msg, args, optteam):
         """<team>
         Display lineup for team.
