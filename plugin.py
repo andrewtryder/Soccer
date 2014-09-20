@@ -332,56 +332,56 @@ class Soccer(callbacks.Plugin):
 
     soccer = wrap(soccer, [('text')])
 
-    def soccerfixtures(self, irc, msg, args, optteam):
-        """<team>
-
-        Display fixtures/results for team.
-        Ex: Manchester United
-        """
-
-        # first, sanitize input name for lookup.
-        optteam = self._sanitizeName(optteam)
-        # see if we can find the team. either returns their id or a list of 5 similar ones.
-        findteam = self._findteam(optteam)
-        if isinstance(findteam, list):  # if match no good, list returned. give simmilar teams.
-            st = " | ".join([i['name'] for i in findteam])  # join for output. display below.
-            irc.reply("ERROR: '{0}' did not match any teams in the database. Did you mean: {1}".format(optteam, st))
-            return
-        # build and fetch url.
-        #url = self._b64decode('aHR0cDovL2VzcG5mYy5jb20vdGVhbS9maXh0dXJlcw==') + '?id=%s&cc=5901' % (findteam)
-        url = 'http://www.espnfc.com/club/%s/%s/fixtures' % (optteam, findteam)
-        html = self._httpget(url)
-        if not html:
-            irc.reply("ERROR: Failed to fetch {0}.".format(url))
-            self.log.error("ERROR opening {0}".format(url))
-            return
-        # process html.
-        soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
-        div = soup.find('div', attrs={'class':'scores'})
-        if not div:
-            irc.reply("ERROR: I could not find any upcoming fixtures for '{0}' at {1}".format(optteam, url))
-            return
-        # we did find something so lets go.
-        scoreboxes = div.findAll('div', attrs={'class':'score-box'})
-        # sanity.
-        if len(scoreboxes) == 0:
-            irc.reply("ERROR: I could not find any upcoming fixtures for '{0}' at {1}".format(optteam, url))
-            return
-        # we did find some so lets go.
-        games = []  # container for output.
-        for sb in scoreboxes:
-            d = sb.find('div', attrs={'class':'date-info'}).getText().encode('utf-8')
-            s = sb.find('div', attrs={'class':re.compile('^score.*')}).getText(separator=' ').encode('utf-8')
-            s = s.replace('Game Details', '')  # strip shit.
-            s = ' '.join(s.split())  # n+1 space = 1 space.
-            games.append("{0} {1}".format(d, s))
-        # grab title before we can output.
-        title = soup.find('title').getText().encode('utf-8').replace(' - ESPN FC - ESPN FC', '')
-        # now output.
-        output = "{0} :: {1}".format(title, " | ".join(games))
-        irc.reply(output)
-
-    soccerfixtures = wrap(soccerfixtures, [('text')])
+    #def soccerfixtures(self, irc, msg, args, optteam):
+    #    """<team>
+    #
+    #    Display fixtures/results for team.
+    #    Ex: Manchester United
+    #    """
+    #
+    #    # first, sanitize input name for lookup.
+    #    optteam = self._sanitizeName(optteam)
+    #    # see if we can find the team. either returns their id or a list of 5 similar ones.
+    #    findteam = self._findteam(optteam)
+    #    if isinstance(findteam, list):  # if match no good, list returned. give simmilar teams.
+    #        st = " | ".join([i['name'] for i in findteam])  # join for output. display below.
+    #        irc.reply("ERROR: '{0}' did not match any teams in the database. Did you mean: {1}".format(optteam, st))
+    #        return
+    #    # build and fetch url.
+    #    #url = self._b64decode('aHR0cDovL2VzcG5mYy5jb20vdGVhbS9maXh0dXJlcw==') + '?id=%s&cc=5901' % (findteam)
+    #    url = 'http://www.espnfc.com/club/%s/%s/fixtures' % (optteam, findteam)
+    #    html = self._httpget(url)
+    #    if not html:
+    #        irc.reply("ERROR: Failed to fetch {0}.".format(url))
+    #        self.log.error("ERROR opening {0}".format(url))
+    #        return
+    #    # process html.
+    #    soup = BeautifulSoup(html, convertEntities=BeautifulSoup.HTML_ENTITIES, fromEncoding='utf-8')
+    #    div = soup.find('div', attrs={'class':'scores'})
+    #    if not div:
+    #        irc.reply("ERROR: I could not find any upcoming fixtures for '{0}' at {1}".format(optteam, url))
+    #        return
+    #    # we did find something so lets go.
+    #    scoreboxes = div.findAll('div', attrs={'class':'score-box'})
+    #    # sanity.
+    #    if len(scoreboxes) == 0:
+    #        irc.reply("ERROR: I could not find any upcoming fixtures for '{0}' at {1}".format(optteam, url))
+    #        return
+    #    # we did find some so lets go.
+    #    games = []  # container for output.
+    #    for sb in scoreboxes:
+    #        d = sb.find('div', attrs={'class':'date-info'}).getText().encode('utf-8')
+    #        s = sb.find('div', attrs={'class':re.compile('^score.*')}).getText(separator=' ').encode('utf-8')
+    #        s = s.replace('Game Details', '')  # strip shit.
+    #        s = ' '.join(s.split())  # n+1 space = 1 space.
+    #        games.append("{0} {1}".format(d, s))
+    #    # grab title before we can output.
+    #    title = soup.find('title').getText().encode('utf-8').replace(' - ESPN FC - ESPN FC', '')
+    #    # now output.
+    #    output = "{0} :: {1}".format(title, " | ".join(games))
+    #    irc.reply(output)
+    #
+    #soccerfixtures = wrap(soccerfixtures, [('text')])
 
     def soccerformation(self, irc, msg, args):
         """
