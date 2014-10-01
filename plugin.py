@@ -502,13 +502,13 @@ class Soccer(callbacks.Plugin):
                 gameid = game.find('a')['href']  # find the gameid.
                 gameid = gameid.replace('gamecast?gameId=', '').replace('&lang=EN&wjb=', '')  # strip.
                 if len(parts) == 4:  # sanity check.
-                    matches[self._sanitizeName(parts[1])] = gameid
-                    matches[self._sanitizeName(parts[2])] = gameid
+                    matches[self._sanitizeName(parts[1])] = gameid.encode('utf-8')
+                    matches[self._sanitizeName(parts[2])] = gameid.encode('utf-8')
         # now, fetch the matchid.
         optmatch = matches.get(optteam)
         if not optmatch:  # we did not find a matching team.
             irc.reply("ERROR: I did not find any matches with a team '{0}' in them playing. Spelled wrong? Missing accent?".format(optteam))
-            irc.reply("The closest five I found: {0}".format(" | ".join([i for i in self._similarTeams(matches, optteam)])))
+            irc.reply("The closest five I found: {0}".format(" | ".join([i.encode('utf-8') for i in self._similarTeams(matches, optteam)])))
             return
         else:  # we did find a match. lets continue.
             # construct url with matchid.
