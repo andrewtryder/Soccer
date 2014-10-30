@@ -116,9 +116,11 @@ class Soccer(callbacks.Plugin):
             local = pytz.timezone("US/Pacific")
         # going "from" here.
         naive = datetime.datetime.strptime(thetime + " " + ampm, "%I:%M %p")
+        # add three minutes here for odd bug.
+        naive = naive+datetime.timedelta(minutes=3)
+        # continue
         local_dt = local.localize(naive, is_dst=None)
         utc_dt = local_dt.astimezone(pytz.timezone(tzstring)) # convert from utc->local(tzstring).
-        # return 24hr.
         return utc_dt.strftime("%H:%M")
 
     def _similarTeams(self, teams, optteam):
