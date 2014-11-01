@@ -114,13 +114,16 @@ class Soccer(callbacks.Plugin):
             local = pytz.timezone("US/Mountain")
         elif origtz == "PT":
             local = pytz.timezone("US/Pacific")
+        # get our base, today.
+        now = datetime.datetime.now()
+        nowy = str(now.year)  # %Y
+        nowm = str('%02d' % now.month)  # %m
+        nowd = str('%02d' % now.day)  # %d
         # going "from" here.
-        naive = datetime.datetime.strptime(thetime + " " + ampm, "%I:%M %p")
-        # add three minutes here for odd bug.
-        naive = naive+datetime.timedelta(minutes=3)
+        naive = datetime.datetime.strptime(nowy + "-" + nowm + "-" + nowd + " " + thetime + " " + ampm, "%Y-%m-%d %I:%M %p")
         # continue
         local_dt = local.localize(naive, is_dst=None)
-        utc_dt = local_dt.astimezone(pytz.timezone(tzstring)) # convert from utc->local(tzstring).
+        utc_dt = local_dt.astimezone(pytz.timezone(tzstring))  # convert from utc->local(tzstring).
         return utc_dt.strftime("%H:%M")
 
     def _similarTeams(self, teams, optteam):
