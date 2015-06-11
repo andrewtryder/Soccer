@@ -204,6 +204,7 @@ class Soccer(callbacks.Plugin):
         """Return string containing league string if valid, None if error. If no league given, return leagues as keys of dict."""
 
         leagues = { 'mls':['usa.1', 'US/Eastern'],
+                    'spl':['sco.1', 'GMT'],
                     'epl':['eng.1', 'GMT'],
                     'laliga':['esp.1', 'CET'],
                     'skybet-cship':['eng.2', 'GMT'],
