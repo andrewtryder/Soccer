@@ -224,7 +224,6 @@ class Soccer(callbacks.Plugin):
                     'allsvenskanliga':['swe.1', 'CET'],
                     'danish':['den.1', 'CET'],
                     'russian':['rus.1','Europe/Moscow'],
-                    'scottish':['sco.1', 'GMT'],
                     'argentina':['arg.1', 'America/Argentina/Buenos_Aires'] }
 
         # check input. if None, return keys. Else, check for key/value match.
