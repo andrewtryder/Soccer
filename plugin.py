@@ -171,6 +171,8 @@ class Soccer(callbacks.Plugin):
         """Return string containing tournament string if valid, None if error. If no tournament is given, return dict keys."""
 
         tournaments = { 'wcq-uefa':['fifa.worldq.uefa', 'CET'],
+                        'wwc':['fifa.wwc', 'US/Eastern'],
+                        'worldcup':['fifa.world', 'US/Eastern'],
                         'intlfriendly':['fifa.friendly', 'US/Eastern'],
                         'wcq-concacaf':['fifa.worldq.concacaf', 'US/Eastern'],
                         'wcq-conmebol':['fifa.worldq.conmebol', 'US/Eastern'],
