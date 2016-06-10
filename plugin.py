@@ -179,6 +179,7 @@ class Soccer(callbacks.Plugin):
                         'wcq-conmebol':['fifa.worldq.conmebol', 'US/Eastern'],
                         'wcq-caf':['FIFA.WORLDQ.CAF', 'US/Eastern'],
                         'confederations':['FIFA.CONFEDERATIONS', 'US/Eastern'],
+                        'euro':['UEFA.EURO', 'CET'],
                         'uefa-u21':['UEFA.EURO_U21', 'CET'],
                         'fifa-u20':['FIFA.WORLD.U20', 'CET'],
                         'ucl':['UEFA.CHAMPIONS', 'CET'],
